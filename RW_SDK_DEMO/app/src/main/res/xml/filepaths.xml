@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-path
+        name="files_path"
+        path="." />
+
+    <cache-path
+        name="files_cache"
+        path="." />
+
+    <root-path
+        name="root"
+        path=""/>
+    <files-path
+        name="files"
+        path="."/>
+
+    <external-files-path
+        name="external_file_path"
+        path="."/>
+
+    <external-cache-path
+        name="external_cache_path"
+        path="."/>
+
+    <external-files-path name="opensdk_external" path="Images/tmp"/>
+    <root-path name="opensdk_root" path=""/>
+
+    <external-path
+        name="external_files"
+        path="." />
+    <path>
+        <root-path
+            name="root_path"
+            path="." />
+    </path>
+
+    <external-path
+        name="camera_photos"
+        path="." />
+
+    <external-path
+        name="external_storage_root"
+        path="." />
+    <grant-uri-permission
+        android:path="string"
+        android:pathPattern="string"
+        android:pathPrefix="string" />
+</paths>

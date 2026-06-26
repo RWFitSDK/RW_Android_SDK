@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--按压状态item-->
+    <item android:state_pressed="true">
+        <shape>
+            <!-- size用于展示，此处设置不生效 -->
+            <size android:width="200dp" android:height="60dp" />
+            <!-- 圆角半径 -->
+            <corners android:radius="30dp" />
+            <!-- 按压背景颜色 -->
+            <solid android:color="#2D6984" />
+        </shape>
+    </item>
+
+    <!--正常状态item-->
+    <item android:state_pressed="false">
+        <shape>
+            <size android:width="200dp" android:height="60dp" />
+            <corners android:radius="30dp" />
+            <!-- 正常背景颜色 -->
+            <solid android:color="#03A9F4" />
+        </shape>
+    </item>
+
+</selector>

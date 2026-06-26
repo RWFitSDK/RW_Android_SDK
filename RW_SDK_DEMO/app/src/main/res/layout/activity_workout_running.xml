@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/workoutTypeLb"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Workout Type"
+        android:textSize="20sp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <TextView
+        android:id="@+id/workoutTimeLb"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Time: 00:00:00"
+        android:textSize="16sp"
+        app:layout_constraintTop_toBottomOf="@id/workoutTypeLb"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <TextView
+        android:id="@+id/workoutStepLb"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Steps: 0"
+        android:textSize="16sp"
+        app:layout_constraintTop_toBottomOf="@id/workoutTimeLb"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <TextView
+        android:id="@+id/workoutDistanceLb"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Distance: 0.00 Km"
+        android:textSize="16sp"
+        app:layout_constraintTop_toBottomOf="@id/workoutStepLb"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <TextView
+        android:id="@+id/workoutCaloriesLb"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Calories: 0 KCal"
+        android:textSize="16sp"
+        app:layout_constraintTop_toBottomOf="@id/workoutDistanceLb"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <TextView
+        android:id="@+id/workoutHeartLb"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="HeartRate: 0 bpm"
+        android:textSize="16sp"
+        app:layout_constraintTop_toBottomOf="@id/workoutCaloriesLb"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <LinearLayout
+        android:id="@+id/buttonGroup"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        app:layout_constraintTop_toBottomOf="@id/workoutHeartLb"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp">
+
+        <Button
+            android:id="@+id/workoutEndBt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="End"
+            android:visibility="gone"/>
+
+        <Button
+            android:id="@+id/workoutPauseBt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Pause"
+            android:layout_marginStart="16dp"/>
+
+        <Button
+            android:id="@+id/workoutContinueBt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Continue"
+            android:layout_marginStart="16dp"
+            android:visibility="gone"/>
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

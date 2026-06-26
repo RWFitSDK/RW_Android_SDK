@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mobile_navigation"
+    app:startDestination="@+id/nav_get_cmd">
+
+    <fragment
+        android:id="@+id/nav_get_cmd"
+        android:name="com.dhouse.dhsdk_v2.ui.get.GetFragment"
+        android:label="@string/menu_get_cmd"
+        tools:layout="@layout/fragment_get_cmd" />
+
+    <fragment
+        android:id="@+id/nav_set_cmd"
+        android:name="com.dhouse.dhsdk_v2.ui.set.SetFragment"
+        android:label="@string/menu_set_cmd"
+        tools:layout="@layout/fragment_set_cmd" />
+
+    <fragment
+        android:id="@+id/nav_control_cmd"
+        android:name="com.dhouse.dhsdk_v2.ui.control.ControlFragment"
+        android:label="@string/menu_control_cmd"
+        tools:layout="@layout/fragment_control" />
+
+    <fragment
+        android:id="@+id/nav_sync_cmd"
+        android:name="com.dhouse.dhsdk_v2.ui.sync.SyncShowFragment"
+        android:label="@string/menu_sync_cmd"
+        tools:layout="@layout/fragment_sync" />
+
+    <fragment
+        android:id="@+id/nav_broadcast_cmd"
+        android:name="com.dhouse.dhsdk_v2.ui.broadcast.BroadcastShowFragment"
+        android:label="@string/menu_broadcast_cmd"
+        tools:layout="@layout/fragment_broadcast" />
+
+    <fragment
+        android:id="@+id/nav_file_cmd"
+        android:name="com.dhouse.dhsdk_v2.ui.file.FileFragment"
+        android:label="文件传输"
+        tools:layout="@layout/fragment_file" />
+</navigation>

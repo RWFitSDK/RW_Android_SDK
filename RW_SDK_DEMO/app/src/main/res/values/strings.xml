@@ -1,0 +1,217 @@
+<resources>
+    <string name="app_name">RW_SDK_Demo</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="nav_header_title">Android Studio</string>
+    <string name="nav_header_subtitle">android.studio@android.com</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">Settings</string>
+
+    <string name="menu_get_cmd">APP获取命令</string>
+    <string name="menu_set_cmd">APP设置命令</string>
+    <string name="menu_control_cmd">APP控制命令</string>
+    <string name="menu_sync_cmd">APP数据同步命令</string>
+    <string name="menu_broadcast_cmd">设备广播接收</string>
+
+    <string-array name="app_type">
+        <item>QQ</item>
+        <item>WECHAT</item>
+        <item>WHATSAPP</item>
+        <item>TWITTER</item>
+        <item>FACEBOOK</item>
+        <item>...5</item>
+        <item>...6</item>
+        <item>OTHERS</item>
+    </string-array>
+
+
+    <string-array name="switch_type">
+        <item>来电提醒</item>
+        <item>SMS</item>
+        <item>QQ</item>
+        <item>WECHAT</item>
+        <item>WHATSAPP</item>
+        <item>MESSENGER</item>
+        <item>TWITTER</item>
+        <item>LINKEDIN</item>
+        <item>INSTAGRAM</item>
+        <item>FACEBOOK</item>
+        <item>LINE</item>
+        <item>企业微信</item>
+        <item>钉钉</item>
+        <item>EMAIL</item>
+        <item>CALENDAR</item>
+        <item>VIBER</item>
+        <item>SKYPE</item>
+        <item>KAKATALK</item>
+        <item>TUMBLR</item>
+        <item>SNAPCHAT</item>
+        <item>YOUTUBE</item>
+        <item>PINTERSET</item>
+        <item>TIKTOK</item>
+        <item>GMAIL</item>
+        <item>OTHERS</item>
+        <item>拍照</item>
+        <item>天气</item>
+    </string-array>
+
+    <string-array name="jlrunning_string_array">
+        <item>running</item>
+        <item>treadmill</item>
+        <item>outdoor running</item>
+        <item>riding</item>
+        <item>swim</item>
+        <item>walking</item>
+        <item>mountain climbing</item>
+        <item>Yoga</item>
+        <item>spinning bike</item>
+        <item>basketball</item>
+        <item>football</item>
+        <item>badminton</item>
+        <item>marathon</item>
+        <item>indoor walking</item>
+        <item>free exercise</item>
+        <item>track and field</item>
+        <item>Physical Training</item>
+        <item>weightlifting</item>
+        <item>boxing</item>
+        <item>jump rope</item>
+        <item>Climb stairs</item>
+        <item>ski</item>
+        <item>skate</item>
+        <item>roller skating</item>
+        <item>indoor cycling</item>
+        <item>Hula Hoop</item>
+        <item>golf</item>
+        <item>baseball</item>
+        <item>dance</item>
+        <item>pingpong</item>
+        <item>hockey</item>
+        <item>Pilates</item>
+        <item>Taekwondo</item>
+        <item>Handball</item>
+        <item>hip-hop</item>
+        <item>volleyball</item>
+        <item>tennis</item>
+        <item>darts</item>
+        <item>gymnastics</item>
+        <item>step on</item>
+        <item>elliptical machine</item>
+        <item>Zumba</item>
+        <item>cricket</item>
+        <item>travel by walking</item>
+        <item>Aerobic exercise</item>
+        <item>rowing machine</item>
+        <item>football</item>
+        <item>Sit-ups</item>
+        <item>dumbbell</item>
+        <item>aerobics</item>
+        <item>karate</item>
+        <item>fencing</item>
+        <item>martial arts</item>
+        <item>Tai Chi</item>
+        <item>Frisbee</item>
+        <item>archery</item>
+        <item>horse riding</item>
+        <item>bowling</item>
+        <item>surf</item>
+        <item>softball</item>
+        <item>squash</item>
+        <item>sailboat</item>
+        <item>pull-ups</item>
+        <item>skateboard</item>
+        <item>trampoline</item>
+        <item>fishing</item>
+        <item>pole dance</item>
+        <item>Square dance</item>
+        <item>Jazz dance</item>
+        <item>ballet</item>
+        <item>disco</item>
+        <item>tap dance</item>
+        <item>modern dance</item>
+        <item>push-up</item>
+        <item>Scooter</item>
+        <item>plank</item>
+        <item>billiards</item>
+        <item>rock climbing</item>
+        <item>discus</item>
+        <item>race</item>
+        <item>wrestling</item>
+        <item>high jump</item>
+        <item>parachute</item>
+        <item>shot put</item>
+        <item>long jump</item>
+        <item>javelin</item>
+        <item>hammer throw</item>
+        <item>Squat</item>
+        <item>Leg press</item>
+        <item>off-road bike</item>
+        <item>motocross</item>
+        <item>Rowing</item>
+        <item>Crossfit</item>
+        <item>water bike</item>
+        <item>kayak</item>
+        <item>croquet</item>
+        <item>floor ball</item>
+        <item>muay thai</item>
+        <item>jai alai</item>
+        <item>Tennis (double)</item>
+        <item>back training</item>
+        <item>water volleyball</item>
+        <item>water skiing</item>
+        <item>climbing machine</item>
+        <item>HIIT</item>
+        <item>BODY COMBAT</item>
+        <item>BODY BALANCE</item>
+        <item>full body resistance exercise</item>
+        <item>Taekwondo</item>
+        <item>BMX</item>
+        <item>stretch</item>
+        <item>indoor fitness</item>
+        <item>flexibility training</item>
+        <item>upper body training</item>
+        <item>Lower body training</item>
+        <item>floor exercise</item>
+        <item>barbell training</item>
+        <item>Physical Training</item>
+        <item>deadlift</item>
+        <item>burpee</item>
+        <item>functional training</item>
+        <item>Waist and abdominal training</item>
+        <item>table football</item>
+        <item>hunt</item>
+        <item>stand up paddle boarding</item>
+        <item>kayak rafting</item>
+        <item>motorboat</item>
+        <item>parkour</item>
+        <item>ATV</item>
+        <item>Paragliding</item>
+        <item>curling</item>
+        <item>ski board</item>
+        <item>skis</item>
+        <item>alpine skiing</item>
+        <item>cross-country skiing</item>
+        <item>snowmobile</item>
+        <item>snowmobile</item>
+        <item>sled</item>
+        <item>squash</item>
+        <item>puck</item>
+        <item>sepak takraw</item>
+        <item>water polo</item>
+        <item>belly dance</item>
+        <item>ballroom dancing</item>
+        <item>folk dance</item>
+        <item>latin dance</item>
+        <item>judo</item>
+        <item>kickboxing</item>
+        <item>fly a kite</item>
+        <item>tug of war</item>
+        <item>shuttlecock</item>
+        <item>kabaddi</item>
+        <item>racing</item>
+        <item>pebbles game</item>
+        <item>tag game</item>
+    </string-array>
+
+
+</resources>

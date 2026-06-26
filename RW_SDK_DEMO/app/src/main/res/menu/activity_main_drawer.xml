@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:showIn="navigation_view">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_get_cmd"
+            android:title="@string/menu_get_cmd" />
+        <item
+            android:id="@+id/nav_set_cmd"
+            android:title="@string/menu_set_cmd" />
+        <item
+            android:id="@+id/nav_control_cmd"
+            android:title="@string/menu_control_cmd" />
+        <item
+            android:id="@+id/nav_sync_cmd"
+            android:title="@string/menu_sync_cmd" />
+        <item
+            android:id="@+id/nav_broadcast_cmd"
+            android:title="@string/menu_broadcast_cmd" />
+        <item
+            android:id="@+id/nav_file_cmd"
+            android:title="文件传输" />
+    </group>
+</menu>
