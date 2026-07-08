@@ -717,13 +717,9 @@ class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBl
         val toolbar:Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
 
-
-        if (!isConnected){
-            XXApplication.instance.isEnterScanUIPage = true
-            startActivity(Intent(this, ScanActivity::class.java))
-        }
-
         binding.disconnect.setOnClickListener(this)
+        binding.reconnect.setOnClickListener(this)
+        binding.searchDevice.setOnClickListener(this)
         //Setting
         binding.btSettingTime.setOnClickListener(this)
         binding.btGetPower.setOnClickListener(this)
@@ -812,6 +808,8 @@ class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBl
 
         DHBleSdk.setConnectBleCallback(this)
         DHBleSdk.subscribeData(touchEventCallback) //监听设备触摸事件
+        loadSavedDevice()
+        updateDevicePanel()
     }
 
 
@@ -823,21 +821,8 @@ class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBl
 
         DHBleSdk.setConnectBleCallback(this)
 
-        device = XXApplication.instance.currentConnectDevcie
-
-        this.device?.let { ble ->
-            isConnected = DHBleSdk.isBleConnected()
-            binding.bleName.text = "Device Bluetooth Name: " + ble.bleName
-            binding.bleMac.text = "MAC: " + ble.bleMac
-            binding.bleStatus.apply {
-                if (isConnected) {
-                    text = "Connected"
-                }
-                else{
-                    text = "Disconnected"
-                }
-            }
-        }
+        loadSavedDevice()
+        updateDevicePanel()
     }
 
     override fun onDestroy() {
@@ -849,15 +834,19 @@ class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBl
     override fun onClick(v: View?) {
         when(v?.id){
             R.id.disconnect -> {
-                //  binding.progressBar.visibility = View.VISIBLE
+              //  binding.progressBar.visibility = View.VISIBLE
 
                 DHBleSdk.disconnect()
                 binding.progressBar.visibility = View.GONE
+                isConnected = false
+                updateDevicePanel()
 
-                if (!XXApplication.instance.isEnterScanUIPage) {
-                    XXApplication.instance.isEnterScanUIPage = true
-                    startActivity(Intent(this@NewMainActivity, ScanActivity::class.java))
-                }
+            }
+            R.id.reconnect -> {
+                reconnectSavedDevice()
+            }
+            R.id.search_device -> {
+                clearSavedDeviceAndSearch()
 
             }
             R.id.clear -> {
@@ -1728,6 +1717,60 @@ class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBl
 
     private var device: BleDevice?= null
 
+    private fun loadSavedDevice() {
+        val currentDevice = XXApplication.instance.currentConnectDevcie
+        device = currentDevice ?: SavedDeviceStore.load(this)
+        if (currentDevice == null) {
+            XXApplication.instance.currentConnectDevcie = device
+        }
+        isConnected = DHBleSdk.isBleConnected()
+    }
+
+    private fun updateDevicePanel() {
+        val savedDevice = device
+        val deviceId = savedDevice?.bleDeviceId?.takeIf { it.isNotBlank() } ?: "-"
+        val name = savedDevice?.bleName?.takeIf { it.isNotBlank() } ?: deviceId
+        val mac = savedDevice?.bleMac?.takeIf { it.isNotBlank() } ?: "-"
+        binding.bleName.text = "Name: $name"
+        binding.bleMac.text = "MAC: $mac"
+        binding.bleDeviceId.text = "DeviceID: $deviceId"
+        binding.bleStatus.text = when {
+            isConnected -> "Connected"
+            savedDevice != null -> "Saved device, disconnected"
+            else -> "No saved device"
+        }
+        binding.reconnect.isEnabled = savedDevice != null && !isConnected
+        binding.disconnect.isEnabled = isConnected
+        binding.searchDevice.text = if (savedDevice == null) "Search Device" else "Search Again"
+    }
+
+    private fun reconnectSavedDevice() {
+        val savedDevice = device ?: SavedDeviceStore.load(this)
+        if (savedDevice?.bleMac.isNullOrBlank()) {
+            Toast.makeText(this, "No saved device, please search first", Toast.LENGTH_SHORT).show()
+            updateDevicePanel()
+            return
+        }
+        device = savedDevice
+        XXApplication.instance.currentConnectDevcie = savedDevice
+        binding.progressBar.visibility = View.VISIBLE
+        updateDevicePanel()
+        binding.bleStatus.text = "Connecting"
+        DHBleSdk.connectDeviceWithModel(savedDevice!!)
+    }
+
+    private fun clearSavedDeviceAndSearch() {
+        DHBleSdk.disconnect()
+        SavedDeviceStore.clear(this)
+        XXApplication.instance.currentConnectDevcie = null
+        XXApplication.instance.currentSupportMenuBean = null
+        device = null
+        isConnected = false
+        updateDevicePanel()
+        XXApplication.instance.isEnterScanUIPage = true
+        startActivity(Intent(this@NewMainActivity, ScanActivity::class.java))
+    }
+
     override fun onBackPressed() {
 //        super.onBackPressed()
 
@@ -1803,10 +1846,27 @@ class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBl
     }
 
     override fun onRingConnecting(device: BleDevice?) {
+        this.device = device ?: this.device
+        XXApplication.instance.currentConnectDevcie = this.device
+        runOnUiThread {
+            binding.progressBar.visibility = View.VISIBLE
+            updateDevicePanel()
+            binding.bleStatus.text = "Connecting"
+        }
 
     }
 
     override fun onRingConnected(device: BleDevice?) {
+        this.device = device ?: this.device
+        this.device?.let {
+            XXApplication.instance.currentConnectDevcie = it
+            SavedDeviceStore.save(this, it)
+        }
+        isConnected = true
+        runOnUiThread {
+            binding.progressBar.visibility = View.GONE
+            updateDevicePanel()
+        }
 
     }
 
@@ -1822,11 +1882,7 @@ class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBl
 
                 postDelayed(Runnable {
                     binding.progressBar.visibility = View.GONE
-
-                    if (!XXApplication.instance.isEnterScanUIPage) {
-                        XXApplication.instance.isEnterScanUIPage = true
-                        startActivity(Intent(this@NewMainActivity, ScanActivity::class.java))
-                    }
+                    updateDevicePanel()
 
                 }, 1000)
             }
@@ -1838,7 +1894,12 @@ class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBl
         Log.e("RWSDK", "onRingDidFunctionMenu " + supportMenuBean + " isSupportSensorRawACC " + supportMenuBean.isSupportSensorRawACC)
 
         EventBus.getDefault().post(EventBusBean.LogEvent("", 0))
+        device?.let {
+            SavedDeviceStore.save(this, it)
+            runOnUiThread {
+                updateDevicePanel()
+            }
+        }
 
     }
-
 }

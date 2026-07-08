@@ -2315,6 +2315,10 @@ private val sensorHistoryRawCallback by lazy {
 
 ## SDK修订记录
 
+**v2.0.0_20260706** (2026.07.06)
+- 优化部分数据同步流程的稳定性
+- 示例工程优化设备保存与重连流程
+
 **v2.0.0_20260616** (2026.06.16)
 - 添加计数提醒间隔设置功能(3.2.1.25)
 - 功能配置表添加`isSupportCountReminder`

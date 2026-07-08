@@ -1,7 +1,6 @@
 package com.dhouse.dhsdk_v2.ui
 
 import android.Manifest
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -12,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.dhouse.dhsdk_v2.BleHelper
 import com.dhouse.dhsdk_v2.R
+import com.dhouse.dhsdk_v2.SavedDeviceStore
 import com.dhouse.dhsdk_v2.ScreenStatusReceive
 import com.dhouse.dhsdk_v2.XXApplication
 import com.dhouse.dhsdk_v2.databinding.ActivityScanBinding
@@ -68,6 +68,7 @@ class ScanActivity : AppCompatActivity(), ScanDeviceCallback, View.OnClickListen
 
 
             XXApplication.instance.currentConnectDevcie = bleDevice
+            SavedDeviceStore.save(this, bleDevice)
 
             DHBleSdk.connectDeviceWithModel(bleDevice)
 
@@ -75,6 +76,7 @@ class ScanActivity : AppCompatActivity(), ScanDeviceCallback, View.OnClickListen
 
         binding.refreshBtn.setOnClickListener(this)
         binding.stopBtn.setOnClickListener(this)
+        binding.backBtn.setOnClickListener(this)
         binding.connecting.setOnClickListener(this)
 
 
@@ -105,23 +107,27 @@ class ScanActivity : AppCompatActivity(), ScanDeviceCallback, View.OnClickListen
         }
     }
     override fun onScanFinish() {
-        binding.refreshBtn.isEnabled = true
-        binding.refreshBtn.alpha = 1f
+        runOnUiThread {
+            binding.refreshBtn.isEnabled = true
+            binding.refreshBtn.alpha = 1f
+        }
     }
 
     override fun onScanDevice(device: BleDevice?) {
-        device?.let {
-            val find = devices.find { local ->
-                local.bleMac == it.bleMac && local.bleName == it.bleName
+        runOnUiThread {
+            device?.let {
+                val find = devices.find { local ->
+                    local.bleMac == it.bleMac && local.bleName == it.bleName
+                }
+                find?.let {f ->
+                    devices -= f
+                }
+                devices += it
+                devices.sortByDescending {ble ->
+                    ble.bleRssi
+                }
+                adapter.notifyDataSetChanged()
             }
-            find?.let {f ->
-                devices -= f
-            }
-            devices += it
-            devices.sortByDescending {ble ->
-                ble.bleRssi
-            }
-            adapter.notifyDataSetChanged()
         }
     }
 
@@ -155,14 +161,30 @@ class ScanActivity : AppCompatActivity(), ScanDeviceCallback, View.OnClickListen
             R.id.stopBtn -> {
                 ScanBleService.getService().stopScan()
             }
+            R.id.backBtn -> {
+                closeScanPage()
+            }
         }
     }
 
+    private fun closeScanPage() {
+        ScanBleService.getService().unRegisterScanBleCallback(this)
+        ScanBleService.getService().stopScan()
+        if (binding.connecting.visibility == View.VISIBLE) {
+            DHBleSdk.disconnect()
+            binding.connecting.visibility = View.INVISIBLE
+        }
+        XXApplication.instance.isEnterScanUIPage = false
+        finish()
+    }
 
     override fun onBackPressed() {
-        val home = Intent(Intent.ACTION_MAIN)
-        home.addCategory(Intent.CATEGORY_HOME)
-        startActivity(home)
+        closeScanPage()
+    }
+
+    override fun onDestroy() {
+        ScanBleService.getService().unRegisterScanBleCallback(this)
+        super.onDestroy()
     }
 
     override fun onRingConnecting(device: BleDevice?) {
@@ -174,7 +196,6 @@ class ScanActivity : AppCompatActivity(), ScanDeviceCallback, View.OnClickListen
     }
 
     override fun onRingConnectFailed(device: BleDevice?, reason: RingBleError) {
-
         runOnUiThread {
             binding.connecting.visibility = View.INVISIBLE
             Toast.makeText(this,"连接失败，请重试",Toast.LENGTH_SHORT).show()
@@ -182,11 +203,11 @@ class ScanActivity : AppCompatActivity(), ScanDeviceCallback, View.OnClickListen
     }
 
     override fun onRingDidFunctionMenu(device: BleDevice?, supportMenuBean: SupportMenuBean) {
+        Log.e("RWSDK", "scan onRingDidFunctionMenu " + supportMenuBean)
+        XXApplication.instance.currentSupportMenuBean = supportMenuBean
+
         runOnUiThread {
             binding.connecting.visibility = View.INVISIBLE
-            Log.e("RWSDK", "scan onRingDidFunctionMenu " + supportMenuBean)
-            XXApplication.instance.currentSupportMenuBean = supportMenuBean
-
             XXApplication.instance.isEnterScanUIPage = false
             finish()
         }
