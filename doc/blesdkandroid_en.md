@@ -70,27 +70,30 @@ DHBleSdk.initSDK(this)
 
 
 
-**To avoid conflicts with the SDK, please add the following configuration to your Proguard obfuscation file:**
+**SDK obfuscation**
 
-```kotlin
--keep class com.example.blesdk.DHBleSdk {
-    *;
-}
--keep class com.example.blesdk.ble.ScanBleService {
-    *;
-}
--keep class com.example.blesdk.bean.** {
-    *;
-}
--keep class com.example.blesdk.ble.** {
-    *;
-}
--keep class com.example.blesdk.callback.** {
-    *;
-}
--keep class com.example.blesdk.utils.** {
-    *;
-}
+The release AAR already obfuscates the SDK's internal implementation and includes consumer rules that preserve its public API. When the AAR is integrated normally through Gradle, these rules are merged automatically into the application's R8/ProGuard configuration, so no additional rules are normally required.
+
+If the AAR is repackaged in a way that discards its consumer rules, add the following fallback rules to the application's ProGuard configuration:
+
+```proguard
+-keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod
+
+-keep class com.example.blesdk.DHBleSdk { *; }
+
+-keep class com.example.blesdk.ble.** { *; }
+-keep class com.example.blesdk.rwbaselibrary.HandlerCallback { *; }
+
+-keep class com.example.blesdk.bean.** { *; }
+-keep class com.example.blesdk.callback.** { *; }
+
+-keep class com.example.blesdk.blering.BaseDataCallback { *; }
+-keep class com.example.blesdk.blering.DeviceDataCallback { *; }
+-keep class com.example.blesdk.blering.BaseAnswerCallback { *; }
+-keep class com.example.blesdk.blering.RingConnectBleCallback { *; }
+-keep class com.example.blesdk.blering.RingBleError { *; }
+
+-keep class com.example.blesdk.utils.** { *; }
 ```
 
 
@@ -2241,7 +2244,6 @@ private val sensorHistoryRawCallback by lazy {
     }
 }
 ```
-
 
 
 

@@ -67,27 +67,30 @@ DHBleSdk.initSDK(this)
 
 
 
-**请避免混淆SDK，在Proguard混淆文件中增加以下配置：**
+**SDK 混淆说明**
 
-```kotlin
--keep class com.example.blesdk.DHBleSdk {
-    *;
-}
--keep class com.example.blesdk.ble.ScanBleService {
-    *;
-}
--keep class com.example.blesdk.bean.** {
-    *;
-}
--keep class com.example.blesdk.ble.** {
-    *;
-}
--keep class com.example.blesdk.callback.** {
-    *;
-}
--keep class com.example.blesdk.utils.** {
-    *;
-}
+Release AAR 已对 SDK 内部实现进行混淆，并已内置用于保留公开 API 的消费者混淆规则。通过 Gradle 正常引入 AAR 时，这些规则会自动合并到应用的 R8/ProGuard 配置中，一般不需要额外配置。
+
+如果使用了会丢失 AAR 消费者混淆规则的二次打包方式，请在应用的 ProGuard 配置中增加以下规则：
+
+```proguard
+-keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod
+
+-keep class com.example.blesdk.DHBleSdk { *; }
+
+-keep class com.example.blesdk.ble.** { *; }
+-keep class com.example.blesdk.rwbaselibrary.HandlerCallback { *; }
+
+-keep class com.example.blesdk.bean.** { *; }
+-keep class com.example.blesdk.callback.** { *; }
+
+-keep class com.example.blesdk.blering.BaseDataCallback { *; }
+-keep class com.example.blesdk.blering.DeviceDataCallback { *; }
+-keep class com.example.blesdk.blering.BaseAnswerCallback { *; }
+-keep class com.example.blesdk.blering.RingConnectBleCallback { *; }
+-keep class com.example.blesdk.blering.RingBleError { *; }
+
+-keep class com.example.blesdk.utils.** { *; }
 ```
 
 
@@ -2314,6 +2317,9 @@ private val sensorHistoryRawCallback by lazy {
    
 
 ## SDK修订记录
+
+**v2.0.0_20260716** (2026.07.16)
+- 优化已知问题
 
 **v2.0.0_20260706** (2026.07.06)
 - 优化部分数据同步流程的稳定性

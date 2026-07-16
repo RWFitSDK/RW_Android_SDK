@@ -64,7 +64,6 @@ import com.example.blesdk.callback.data.CountReminderIntervalCallback
 import com.example.blesdk.callback.status.CommonStatusCallback
 import com.example.blesdk.callback.status.FindDeviceControlCallback
 import com.example.blesdk.callback.status.HealthDataControlCallback
-import com.example.blesdk.service.PXIOtaService
 import com.example.blesdk.utils.CmdConstants
 import com.example.blesdk.utils.Constants
 import org.greenrobot.eventbus.EventBus
