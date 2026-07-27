@@ -197,6 +197,9 @@ DeviceFuncV2Model类属性定义:
 | SupportMenuBean属性         | 说明                     |
 | --------------------------- | ------------------------ |
 | isPushMsgEnableSwitch       | 是否启用消息控制开关     |
+| pushMsgSwitchValue          | 消息类型支持能力低32位（bit0-bit31） |
+| pushMsgSwitchValue2         | 消息类型支持能力高32位（bit32-bit63），旧设备默认为0 |
+| activityDataInterval        | 当天计步明细间隔（分钟）；未配置时按60处理 |
 | isAlarm                     | 是否支持闹钟             |
 | isBrightScreenSleepTime     | 是否支持屏幕睡眠时间设置 |
 | isBrightScreenTime          | 是否支持亮屏时长         |
@@ -228,7 +231,6 @@ DeviceFuncV2Model类属性定义:
 | isSupportSensorRawSleep     | 是否支持睡眠实时数据       |
 | isSupportFallDetect         | 是否支持跌落提醒           |
 | isSupportRecording          | 是否支持录音功能           |
-
 
 
 ### 3.2 设备功能操作
@@ -1725,6 +1727,13 @@ DHBleSdk.syncHealthDataByType(Constants.RingHealthType.TODAY_STEP, this)
    >
    > 如果有历史数据会分两次回调, 第一次为今天的数据,只会有一天的即一条数据; 第二次为历史计步数据,就可能会返回多天的;
 
+   今天与历史计步数据都使用 `StepSyncBean`，区别如下：
+
+   | 数据 | 回调内容 | `items` 内容 | 总数来源 |
+   | ---- | -------- | ----------- | -------- |
+   | 今天计步 | 第一次回调，通常只有一个 `StepSyncBean` | 设备当天实际返回的明细 | 使用设备返回的当天总步数、总卡路里和总里程 |
+   | 历史计步 | 第二次回调，可能包含多个日期的 `StepSyncBean` | 按日期分组后的设备实际明细 | 对当天历史明细的步数、卡路里和里程分别求和 |
+
    ```java
    public class StepSyncBean {
        private long time;//日期时间戳
@@ -1732,20 +1741,26 @@ DHBleSdk.syncHealthDataByType(Constants.RingHealthType.TODAY_STEP, this)
        private int totalCalorie;//总卡路里cal
        private int totalDistance;//总里程m
        private int itemCount;//数据量
-       private List<StepItemBean> items;//步数详情,每小时的计步数据;
+       private int activityDataInterval;//计步明细间隔（分钟），默认60
+       private List<StepItemBean> items;//设备实际返回的计步明细
    
        private String date;
        private String hour;
        }
    
    public class StepItemBean {
-       private int index;//小时序号(0-23,代表0-23小时)
+       private long timestamp;//Unix时间戳，单位秒
+       private int index;//当天按当前计步粒度划分后的明细序号
        private int steps;//步数
        private int calorie;//卡路里
        private int distance;//里程
    }
    
    ```
+
+   `activityDataInterval` 表示 `items` 的计步明细间隔，单位为分钟；
+   `60` 表示每小时一条，`10` 表示每10分钟一条，未配置时默认为 `60`。
+   请使用 `timestamp` 作为明细的准确时间。
 
 2. void onSyncSleep(List<SleepSyncBean> var1);
 
@@ -2317,6 +2332,9 @@ private val sensorHistoryRawCallback by lazy {
    
 
 ## SDK修订记录
+
+**v2.0.0_20260724** (2026.07.24)
+- 添加计步明细间隔支持
 
 **v2.0.0_20260716** (2026.07.16)
 - 优化已知问题

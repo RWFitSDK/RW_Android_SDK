@@ -1,13 +1,17 @@
 package com.dhouse.dhsdk_v2
 
+import android.content.ClipData
 import android.content.Intent
 import android.os.Bundle
 import android.os.Message
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.content.FileProvider
 import com.dhouse.dhsdk_v2.databinding.ActivityNewMainBinding
 import com.dhouse.dhsdk_v2.ui.ScanActivity
 import com.dhouse.dhsdk_v2.ui.Workout.WorkoutTypeActivity
@@ -71,6 +75,8 @@ import org.greenrobot.eventbus.EventBus
 class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBleCallback, HealthDataSyncCallback {
 
     private var isConnected: Boolean = false
+    @Volatile
+    private var isSharingLogs: Boolean = false
 
     private val binding by lazy {
         ActivityNewMainBinding.inflate(layoutInflater)
@@ -811,7 +817,6 @@ class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBl
         updateDevicePanel()
     }
 
-
     override fun onResume() {
         super.onResume()
         XXApplication.instance.isEnterOta = false
@@ -827,6 +832,70 @@ class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBl
     override fun onDestroy() {
         super.onDestroy()
 
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.main, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_share_logs -> {
+                shareLogs()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun shareLogs() {
+        if (isSharingLogs) return
+        isSharingLogs = true
+        Toast.makeText(this, R.string.preparing_log_archive, Toast.LENGTH_SHORT).show()
+
+        Thread {
+            val result = runCatching { LogShareUtils.createLogArchive(applicationContext) }
+            runOnUiThread {
+                isSharingLogs = false
+                if (isFinishing || isDestroyed) return@runOnUiThread
+
+                val archive = result.getOrNull()
+                if (archive == null) {
+                    val message = if (result.isFailure) {
+                        Log.e("RWSDK", "share logs failed", result.exceptionOrNull())
+                        R.string.share_logs_failed
+                    } else {
+                        R.string.no_logs_to_share
+                    }
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                    return@runOnUiThread
+                }
+
+                runCatching {
+                    val uri = FileProvider.getUriForFile(
+                        this,
+                        "$packageName.provider",
+                        archive
+                    )
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/zip"
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        clipData = ClipData.newUri(contentResolver, archive.name, uri)
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                    }
+                    startActivity(
+                        Intent.createChooser(
+                            shareIntent,
+                            getString(R.string.share_logs_chooser)
+                        )
+                    )
+                }.onFailure { error ->
+                    Log.e("RWSDK", "open log share chooser failed", error)
+                    Toast.makeText(this, R.string.share_logs_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
     }
 
 
@@ -1876,6 +1945,13 @@ class NewMainActivity : AppCompatActivity(), View.OnClickListener, RingConnectBl
         EventBus.getDefault().post(EventBusBean.LogEvent("", 1))
 
         runOnUiThread {
+            if (reason == RingBleError.BLUETOOTH_GATT_CACHE_RESTRICTED) {
+                Toast.makeText(
+                    this,
+                    "蓝牙缓存异常，请关闭并重新打开手机蓝牙后重试",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
             binding.bleStatus.apply {
                 text = "Disconnected"
 

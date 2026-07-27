@@ -198,7 +198,12 @@ class ScanActivity : AppCompatActivity(), ScanDeviceCallback, View.OnClickListen
     override fun onRingConnectFailed(device: BleDevice?, reason: RingBleError) {
         runOnUiThread {
             binding.connecting.visibility = View.INVISIBLE
-            Toast.makeText(this,"连接失败，请重试",Toast.LENGTH_SHORT).show()
+            val message = if (reason == RingBleError.BLUETOOTH_GATT_CACHE_RESTRICTED) {
+                "蓝牙缓存异常，请关闭并重新打开手机蓝牙后重试"
+            } else {
+                "连接失败，请重试"
+            }
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }
     }
 

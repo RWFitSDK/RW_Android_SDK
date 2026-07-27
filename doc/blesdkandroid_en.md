@@ -43,6 +43,12 @@ implementation files('libs/blesdk_rwfit_release_260130.aar')
 ```
 
 
+## SDK Revision History
+
+**V2.0.0_20260724** (2026.07.24)
+
+- Added support for step-detail intervals.
+
 
 **Step 3: You need to enable Bluetooth on your phone and grant Bluetooth and location permissions.**
 
@@ -202,6 +208,9 @@ DeviceFuncV2Model class attribute definitions:
 | SupportMenuBean attribute   | Description                                                  |
 | --------------------------- | ------------------------------------------------------------ |
 | isPushMsgEnableSwitch       | Enable or disable the message control switch?                |
+| pushMsgSwitchValue          | Supported message types, low 32 bits (bit0-bit31)            |
+| pushMsgSwitchValue2         | Supported message types, high 32 bits (bit32-bit63); defaults to 0 on old devices |
+| activityDataInterval        | Today's step-detail interval in minutes; an unconfigured value is normalized to 60 |
 | isAlarm                     | Does it support an alarm clock?                              |
 | isBrightScreenSleepTime     | Does it support screen sleep time settings?                  |
 | isBrightScreenTime          | Does it support screen-on time adjustment?                   |
@@ -233,7 +242,6 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportSensorRawSleep     | Does it support sleep real-time data?                        |
 | isSupportFallDetect         | Does it support fall detection alert?                        |
 | isSupportRecording          | Does it support recording function?                          |
-
 
 
 ### 3.2 Device function operation
@@ -1694,6 +1702,13 @@ DHBleSdk.syncHealthDataByType(Constants.RingHealthType.TODAY_STEP, this)
 >
 > If there is historical data, the callback will be triggered twice. The first time is for today's data, which will only contain one day's data; the second time is for historical step count data, which may return data for multiple days;
 
+Both today's and historical step data use `StepSyncBean`:
+
+| Data | Callback content | `items` content | Daily totals |
+| ---- | ---------------- | --------------- | ------------ |
+| Today | First callback, normally one `StepSyncBean` | Actual details returned by the device for today | Uses the daily total steps, calories, and distance returned by the device |
+| History | Second callback, possibly multiple dated `StepSyncBean` objects | Actual device details grouped by date | Sums the historical details for steps, calories, and distance |
+
 ```java
 public class StepSyncBean {
   private long time; // Date timestamp
@@ -1701,20 +1716,27 @@ public class StepSyncBean {
   private int totalCalorie; // Total calories (cal)
   private int totalDistance; // Total distance (m)
   private int itemCount; // Number of data points
-  private List<StepItemBean> items; // Step details, hourly step count data;
+  private int activityDataInterval; // Detail interval in minutes; defaults to 60
+  private List<StepItemBean> items; // Actual step details returned by the device
 
   private String date;
   private String hour;
 }
 
 public class StepItemBean {
-  private int index; // Hour index (0-23, representing 0-23 hours)
+  private long timestamp; // Unix timestamp in seconds
+  private int index; // Detail slot within the day at the current step interval
   private int steps; // Steps
   private int calorie; // Calories
   private int distance; // Distance
 }
 
 ```
+
+`activityDataInterval` is the interval, in minutes, between step details in
+`items`. A value of `60` means one detail per hour, and `10` means one detail
+every 10 minutes. The default is `60` when unconfigured. Use `timestamp` as
+the precise detail time.
 
 2. void onSyncSleep(List<SleepSyncBean> var1);
 
@@ -2244,13 +2266,3 @@ private val sensorHistoryRawCallback by lazy {
     }
 }
 ```
-
-
-
-
-
-
-
-
-
-

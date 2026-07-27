@@ -2,8 +2,9 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_settings"
-        android:orderInCategory="100"
-        android:title="@string/action_settings"
-        app:showAsAction="never" />
+        android:id="@+id/action_share_logs"
+        android:icon="@drawable/ic_menu_share"
+        android:orderInCategory="10"
+        android:title="@string/share_logs"
+        app:showAsAction="always" />
 </menu>
