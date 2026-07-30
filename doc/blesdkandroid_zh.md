@@ -295,81 +295,85 @@ DHBleSdk.setUserInfo(persionBean)
 
 ##### 3.2.1.3 获取设备信息
 
-> 接口说明: 获取固件型号,固件版本号,UI版本号; 
+> 获取设备型号、固件版本号、屏幕信息和UI版本号.
 >
 > 订阅 `FirmwareCallback` 获取结果.
 
+方法说明:
+
+`fun getFirmwareVersionJL()`
+
+返回说明:
+
+| FirmVersionBean属性 | 类型   | 说明                         |
+| ------------------- | ------ | ---------------------------- |
+| deviceClazz         | String | 设备型号, 每个型号产品的唯一标识 |
+| deviceNo            | String | 固件版本号                   |
+| screenType          | int    | 屏幕类型: 0.方屏 1.圆屏      |
+| screenWidth         | int    | 屏幕宽度                     |
+| screenHeight        | int    | 屏幕高度                     |
+| uiVersion           | String | UI版本号                     |
+
+> **注意:** 升级固件前必须校验设备的 `deviceClazz` 与升级固件对应的设备型号是否一致, 只有型号一致时才能进行升级, 型号不一致时禁止升级.
+
+调用示例:
+
 ```kotlin
-//1. 订阅LoginDeviceCallback回调
 DHBleSdk.subscribeData(object : FirmwareCallback {
-    override fun onSuccess() {
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "firmware info get failed, errorCode=$errorCode")
+  }
+
+  override fun onResult(data: FirmVersionBean?) {
+    data?.let {
+      Log.e("RWSDK", "firmware info --> $it")
     }
-    override fun onFail(errorCode: Int) {
-        onAppend("ERROR CODE $errorCode")
-    }
-    override fun onResult(data: FirmVersionBean?) {
-        data?.let {
-            onAppend("固件版本 --> \n$it")
-        }
-    }
+  }
 })
 
-
-//2. 发送数据, 结果将在FirmwareCallback 里获取到.
 DHBleSdk.getFirmwareVersionJL()
-
-//3. 取消订阅
-DHBleSdk.dispose(FirmwareCallback)
-
-//FirmVersionBean 实体类
-public class FirmVersionBean extends BleSendBean {
-    private String deviceClazz = "";//设备型号
-    private String deviceNo = "1.0.0"; //设备版本号
-    private int screenType; //0方 1圆
-    private int screenWidth; //设备宽
-    private int screenHeight; //设备高
-    private String uiVersion; //UI版本号
-}
 ```
 
 
 
-##### 3.2.1.4 **获取电量**
+##### 3.2.1.4 获取电量
 
-> 接口说明: app获取设备电量
+> APP获取设备的电量信息.
 >
 > 订阅 `PowerCallback` 获取结果.
 
+方法说明:
+
+`fun getPowerJL()`
+
+返回说明:
+
+| PowerBean属性 | 类型 | 说明                |
+| ------------- | ---- | ------------------- |
+| power         | int  | 剩余电量, 范围0-100 |
+
+调用示例:
+
 ```kotlin
-//1. 订阅PowerCallback回调
 DHBleSdk.subscribeData(object : PowerCallback {
-    override fun onSuccess() {
-    }
+  override fun onSuccess() {
+  }
 
-    override fun onFail(errorCode: Int) {
-        onAppend("ERROR CODE $errorCode")
-    }
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "power get failed, errorCode=$errorCode")
+  }
 
-    override fun onResult(data: PowerBean?) {
-        data?.let {
-            onAppend("设备电量 --> \n$it")
-        }
+  override fun onResult(data: PowerBean?) {
+    data?.let {
+      Log.e("RWSDK", "power --> $it")
     }
+  }
 })
 
-
-//2. 发送数据, 结果将在PowerCallback里获取到.
 DHBleSdk.getPowerJL()
-
-//3. 取消订阅
-DHBleSdk.dispose(PowerCallback)
-
-//PowerBean 实体类
-public class PowerBean implements Parcelable {
-    private boolean isLowPower;//低电状态
-    private int powerStatus;//充电状态，0未充电，1正在充电 2充电完成
-    private int power;//电量 0-100
-}
 ```
 
 
@@ -439,64 +443,116 @@ DHBleSdk.setRingLedLevel(tBrightScreenLedBean)
 
 ##### 3.2.1.7 获取与设置佩戴位置
 
-> 配置表属性: `isWearDir` ;
+> 获取或设置戒指的佩戴位置.
+>
+> 配置表属性: `isWearDir`.
 >
 > 订阅 `WearHandCallback` 获取结果.
 
+方法说明:
+
+`fun getRingWearDir()`
+
+`fun setRingWearHand(isOpen: Boolean)`
+
+参数说明:
+
+| 参数   | 类型    | 说明     | 值                    |
+| ------ | ------- | -------- | --------------------- |
+| isOpen | Boolean | 佩戴位置 | false.左手 true.右手  |
+
+返回说明:
+
+| FactoryInBean属性 | 类型 | 说明                     |
+| ----------------- | ---- | ------------------------ |
+| isOpen            | int  | 佩戴位置: 0.左手 1.右手  |
+
+调用示例:
+
 ```kotlin
+val wearHandCallback = object : WearHandCallback {
+  override fun onSuccess() {
+    Log.e("RWSDK", "wear hand operation success")
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "wear hand operation failed, errorCode=$errorCode")
+  }
+
+  override fun onResult(data: FactoryInBean?) {
+    data?.let {
+      Log.e("RWSDK", "wear hand=${it.isOpen()}")
+    }
+  }
+}
+
+DHBleSdk.subscribeData(wearHandCallback)
+
 // 获取佩戴位置
-DHBleSdk.subscribeData(ringWearHandCallback)
 DHBleSdk.getRingWearDir()
 
-//设置佩戴位置
-DHBleSdk.subscribeData(ringWearHandCallback)
-DHBleSdk.setRingWearHand(false) //False is left hand, true is right hand
+// 设置为左手佩戴
+DHBleSdk.setRingWearHand(false)
+
+// 设置为右手佩戴
+DHBleSdk.setRingWearHand(true)
 ```
 
 
 
 ##### 3.2.1.8 启动与关闭拍照
 
-> 启动拍照功能后,设备可通过手势控制app自定义相机拍照
+> APP进入自定义相机页面时开启拍照控制, 开启后设备可通过手势通知APP执行拍照; APP退出相机页面时关闭拍照控制.
 >
-> 订阅`TakePhotoCallback` 设备发出拍照通知,进行拍照.
+> 配置表属性: `isTakePhoto`.
 >
-> 配置表属性: `isTakePhoto` ;
+> 订阅 `TakePhotoCallback` 接收设备发出的拍照通知.
+
+方法说明:
+
+`fun controlTakePhotoJL(controlType: Int)`
+
+参数说明:
+
+| 参数        | 类型 | 说明     | 值                  |
+| ----------- | ---- | -------- | ------------------- |
+| controlType | Int  | 拍照控制 | 0.关闭拍照 1.开启拍照 |
+
+返回说明:
+
+| 回调数据 | 类型 | 说明                     |
+| -------- | ---- | ------------------------ |
+| data     | Int  | 2.设备通知APP执行拍照     |
+
+调用示例:
 
 ```kotlin
-//APP进相机界面启动 1为控制设备进对应界面, 0为控制设备退出
-DHBleSdk.subscribeData(takePhotoCallback)
-DHBleSdk.controlTakePhotoJL(1) //Open Photo打开拍照
+private val takePhotoCallback = object : TakePhotoCallback {
+  override fun onSuccess() {
+    Log.e("RWSDK", "take photo control success")
+  }
 
-//0为控制设备退出
-DHBleSdk.dispose(takePhotoCallback)
-DHBleSdk.controlTakePhotoJL(0) //Close photo taking关闭拍照                  
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "take photo control failed, errorCode=$errorCode")
+  }
 
-//监听设备发出拍照指令
-/**
-     * Camera control monitoring 拍照控制监听
-     */
-private val takePhotoCallback by lazy {
-  object : TakePhotoCallback {
-    override fun onSuccess() {
-      Log.e("RWSDK", "Output: TakePhotoCallback onSuccess")
-    }
-
-    override fun onFail(errorCode: Int) {
-
-    }
-
-    override fun onResult(data: Int?) {
-      Log.e("RWSDK", "Output: TakePhotoCallback onResult " + data)
-      data.let {
-        when (it){
-          2 -> {
-            //TODO Start the phone's custom camera to take photos 启动手机自定义相机拍照
-          }
-        }
-      }
+  override fun onResult(data: Int?) {
+    if (data == 2) {
+      // 设备发出拍照通知, APP在此执行自定义相机拍照
     }
   }
+}
+
+// APP进入相机页面时调用
+fun onCameraPageOpened() {
+  DHBleSdk.subscribeData(takePhotoCallback)
+  DHBleSdk.controlTakePhotoJL(1)
+}
+
+// APP退出相机页面时调用
+fun onCameraPageClosed() {
+  DHBleSdk.controlTakePhotoJL(0)
+  DHBleSdk.dispose(takePhotoCallback)
 }
 ```
 
@@ -1057,6 +1113,8 @@ DHBleSdk.getAlarmVibrationDuration()
 > 设备触摸事件通知, 设备主动上报. 触摸操作无论熄屏与否都会上报, 由APP定义响应行为.
 >
 > 订阅 `TouchEventCallback` 接收触摸事件.
+>
+> **提示:** 此功能为设备端定制功能, 使用前请确认设备厂家已在固件中集成并启用; 未定制或未启用时, APP无法收到触摸事件通知.
 
 TouchEventCallback 返回 int[] 数据说明:
 
@@ -1686,8 +1744,6 @@ public interface HealthDataSyncCallback {
 
   void onSyncBloodSugar(List<BloodSugarSyncBean> var1); //血糖
 
-  void onSyncBreath(List<BreatheSyncBean> var1);
-
   void onSyncHrv(List<HrvSyncBean> var1); //HRV
 
   void onSyncMuslimCount(List<MuslimCountSyncBean> var1); //赞念
@@ -1721,142 +1777,155 @@ DHBleSdk.syncHealthDataByType(Constants.RingHealthType.TODAY_STEP, this)
 
 ##### 3.2.2.4 全天检测-健康数据说明
 
-1. 今天与历史计步数据 void onSyncStep(List<StepSyncBean> var1)
+`HealthDataSyncCallback` 按健康数据类型返回对应的日期数据列表, 每个日期对象通过 `items` 提供当天的测量明细.
 
-   > [!CAUTION]
-   >
-   > 如果有历史数据会分两次回调, 第一次为今天的数据,只会有一天的即一条数据; 第二次为历史计步数据,就可能会返回多天的;
+> [!IMPORTANT]
+>
+> 本节中的 `time`、`timeMills`、`timestamp`、`asleepTime`、`awakeTime` 均为Unix时间戳, 单位为秒. `timeMills` 是历史命名, 实际不是毫秒; 转换为Java毫秒时间戳时需乘以 `1000`.
 
-   今天与历史计步数据都使用 `StepSyncBean`，区别如下：
+###### 3.2.2.4.1 健康数据回调总览
 
-   | 数据 | 回调内容 | `items` 内容 | 总数来源 |
-   | ---- | -------- | ----------- | -------- |
-   | 今天计步 | 第一次回调，通常只有一个 `StepSyncBean` | 设备当天实际返回的明细 | 使用设备返回的当天总步数、总卡路里和总里程 |
-   | 历史计步 | 第二次回调，可能包含多个日期的 `StepSyncBean` | 按日期分组后的设备实际明细 | 对当天历史明细的步数、卡路里和里程分别求和 |
+| 健康数据 | 回调方法 | 日期对象 | 明细对象 | 说明 |
+| -------- | -------- | -------- | -------- | ---- |
+| 计步 | `onSyncStep` | `StepSyncBean` | `StepItemBean` | 今天与历史计步可能分两次回调 |
+| 睡眠 | `onSyncSleep` | `SleepSyncBean` | `SleepItemBean` | 返回设备保存的多天睡眠数据 |
+| 心率 | `onSyncHr` | `HeartRateSyncBean` | `HeartRateItemBean` | 按日期分组 |
+| 血压 | `onSyncBp` | `BloodPressSyncBean` | `BloodPressItemBean` | 按日期分组 |
+| 血氧 | `onSyncBo` | `BloodOxySyncBean` | `BloodOxyItemBean` | 按日期分组 |
+| 体温 | `onSyncTemp` | `BodyTempSyncBean` | `BodyTempItemBean` | 按日期分组 |
+| 压力 | `onSyncPressure` | `PressureSyncBean` | `PressureItemBean` | 按日期分组 |
+| 血糖 | `onSyncBloodSugar` | `BloodSugarSyncBean` | `BloodSugarItemBean` | 按日期分组 |
+| HRV | `onSyncHrv` | `HrvSyncBean` | `HrvItemBean` | 按日期分组 |
+| 赞念 | `onSyncMuslimCount` | `MuslimCountSyncBean` | `MuslimCountItemBean` | 包含当天总数及每小时明细 |
 
-   ```java
-   public class StepSyncBean {
-       private long time;//日期时间戳
-       private int totalSteps;//总步数
-       private int totalCalorie;//总卡路里cal
-       private int totalDistance;//总里程m
-       private int itemCount;//数据量
-       private int activityDataInterval;//计步明细间隔（分钟），默认60
-       private List<StepItemBean> items;//设备实际返回的计步明细
-   
-       private String date;
-       private String hour;
-       }
-   
-   public class StepItemBean {
-       private long timestamp;//Unix时间戳，单位秒
-       private int index;//当天按当前计步粒度划分后的明细序号
-       private int steps;//步数
-       private int calorie;//卡路里
-       private int distance;//里程
-   }
-   
-   ```
+除计步、睡眠和赞念外, 其他日期对象具有相同的基本结构:
 
-   `activityDataInterval` 表示 `items` 的计步明细间隔，单位为分钟；
-   `60` 表示每小时一条，`10` 表示每10分钟一条，未配置时默认为 `60`。
-   请使用 `timestamp` 作为明细的准确时间。
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| time | long | 日期时间戳, Unix秒 |
+| itemCount | int | 当天明细数量 |
+| items | List | 当天的测量明细 |
 
-2. void onSyncSleep(List<SleepSyncBean> var1);
+###### 3.2.2.4.2 普通测量数据明细
 
-   > [!CAUTION]
-   >
-   > 返回的为设备里多天所有睡眠状态数据；
+普通测量明细使用 `timeMills` 表示测量时间, 单位为Unix秒. 各类型的数值字段如下:
 
-   
+| 数据 | 明细对象 | 数值字段 | 单位/换算 |
+| ---- | -------- | -------- | --------- |
+| 心率 | `HeartRateItemBean` | `hr` | bpm |
+| 血压 | `BloodPressItemBean` | `sp`(收缩压)、`dp`(舒张压) | mmHg |
+| 血氧 | `BloodOxyItemBean` | `bloodOxy` | % |
+| 体温 | `BodyTempItemBean` | `temp` | 实际温度=`temp / 10`℃, 如365表示36.5℃ |
+| 压力 | `PressureItemBean` | `pressure` | 设备压力值, 无单位 |
+| 血糖 | `BloodSugarItemBean` | `sugar` | `float`, 不可按整数处理 |
+| HRV | `HrvItemBean` | `hrv` | ms |
 
-   ```java
-   public class SleepSyncBean {
-       private long time; //睡眠当天时间戳 秒(s)
-       private long totalSleepTime; //睡眠总时长 分钟(min)
-       private long asleepTime; //睡眠开始时间戳
-       private long awakeTime; //睡眠结束时间戳
-       private int itemCount; //睡眠状态个数
-       private List<SleepItemBean> items; //睡眠状态详细值
-   }
-   
-   public class SleepItemBean {
-       private int len; //当前睡眠类型时长 分钟(min)
-       private int sleepType; //睡眠类型: 0为清醒 1为浅睡 2深睡
-   }
-   ```
+> [!CAUTION]
+>
+> 血压包含 `sp` 和 `dp` 两个数值, 不可按单值处理; 血糖 `sugar` 为 `float`, 不可按整数处理.
 
-3. 心率数据 void onSyncHr(List<HeartRateSyncBean> var1)
+###### 3.2.2.4.3 计步数据
 
-   > [!CAUTION]
-   >
-   > 返回多天数据(今天与历史);根据time来区分对应天.
+回调方法: `onSyncStep(List<StepSyncBean> data)`
 
-   
+> [!CAUTION]
+>
+> 如果设备存在历史计步数据, `onSyncStep` 会分两次回调: 第一次返回今天计步, 通常只有一个 `StepSyncBean`; 第二次返回历史计步, 可能包含多个日期.
 
-   ```java
-   public class HeartRateSyncBean {
-       private long time;//日期时间戳
-       private int itemCount;//数据量
-   
-       private List<HeartRateItemBean> items;//数据条目,对应天的心率值
-   }
-   
-   public class HeartRateItemBean {
-       private long timeMills;//时间戳
-       private int hr;
-   
-       private String date;
-       private String hour;
-   }
-   ```
+今天与历史计步均使用 `StepSyncBean`:
 
-   **心率变异性(HRV)`HrvSyncBean`, 血氧`BloodOxySyncBean`,压力`BloodPressSyncBean`,血糖`BloodSugarSyncBean`,血压`BloodPressItemBean`与心率类似不一一说明**
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| time | long | 日期时间戳, Unix秒 |
+| totalSteps | int | 当天总步数 |
+| totalCalorie | int | 当天总卡路里, cal |
+| totalDistance | int | 当天总里程, m |
+| itemCount | int | 明细数量 |
+| activityDataInterval | int | 计步明细间隔, 单位分钟, 未配置时默认60 |
+| items | `List<StepItemBean>` | 设备实际返回的计步明细 |
 
-   **体温`BodyTempSyncBean`:**
+`StepItemBean` 字段:
 
-   ```java
-   public class BodyTempSyncBean {
-       private long time;//日期时间戳
-       private int itemCount;//数据量
-       private List<BodyTempItemBean> items;
-   }
-   
-   public class BodyTempItemBean {
-       private long timeMills;//测量时间戳 秒(s)
-       private int temp;//体温原始值(实际温度=temp/10, 如365=36.5℃)
-       private String date;
-       private String hour;
-   }
-   ```
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| timestamp | long | 明细的Unix时间戳, 单位秒 |
+| index | int | 当前计步粒度下, 明细在当天的序号 |
+| steps | int | 当前明细步数 |
+| calorie | int | 当前明细卡路里 |
+| distance | int | 当前明细里程 |
 
-4. 赞念数据 void onSyncMuslimCount(List<MuslimCountSyncBean> var1)
+| 数据 | `items` 内容 | 总数来源 | 明细间隔 |
+| ---- | ------------ | -------- | -------- |
+| 今天计步 | 设备当天实际返回的明细 | 使用设备返回的当天总步数、总卡路里和总里程 | 根据 `activityDataInterval`, 支持10或60分钟 |
+| 历史计步 | 按日期分组后的设备实际明细 | 对当天历史明细的步数、卡路里和里程分别求和 | 固定60分钟 |
 
-   ```java
-   public class MuslimCountSyncBean {
-       private long time;//日期时间戳
-       private int itemCount;//数据量
-       private int totalCount;//总数据量
-       private List<MuslimCountItemBean> items;
-   }
-   
-   public class MuslimCountItemBean {
-       private long timeMills;//测试时间 时间戳 s
-       private int count;//计数数量;每小时累加赞念;
-   
-       private String date;
-       private String hour;
-   }
-   ```
+`activityDataInterval=60` 表示每小时一条, `10` 表示每10分钟一条. 请使用 `StepItemBean.timestamp` 作为明细的准确时间.
+
+###### 3.2.2.4.4 睡眠数据
+
+回调方法: `onSyncSleep(List<SleepSyncBean> data)`
+
+> [!CAUTION]
+>
+> 返回设备中保存的多天睡眠状态数据.
+
+`SleepSyncBean` 字段:
+
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| time | long | 睡眠记录时间戳, Unix秒 |
+| totalSleepTime | long | 睡眠总时长, 单位分钟 |
+| asleepTime | long | 入睡时间戳, Unix秒 |
+| awakeTime | long | 醒来时间戳, Unix秒 |
+| itemCount | int | 睡眠状态明细数量 |
+| items | `List<SleepItemBean>` | 睡眠状态明细 |
+
+`SleepItemBean` 字段:
+
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| len | int | 当前睡眠状态持续时长, 单位分钟 |
+| sleepType | int | 睡眠状态: 0.清醒 1.浅睡 2.深睡 3.REM |
+| isTemporary | int | 数据状态: 0.正式数据 1.临时数据 |
+
+###### 3.2.2.4.5 赞念数据
+
+回调方法: `onSyncMuslimCount(List<MuslimCountSyncBean> data)`
+
+`MuslimCountSyncBean` 字段:
+
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| time | long | 日期时间戳, Unix秒 |
+| itemCount | int | 当天明细数量 |
+| totalCount | int | 当天总计数 |
+| items | `List<MuslimCountItemBean>` | 当天按小时记录的计数明细 |
+
+`MuslimCountItemBean` 字段:
+
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| timeMills | long | 明细时间戳, Unix秒 |
+| count | int | 对应小时的累计计数 |
+| date | String | 明细日期 |
+| hour | String | 明细小时 |
 
 
 
 
 #### 3.2.3 OTA升级
 
-> [!NOTE]
+> [!CAUTION]
 >
-> ota升级文件需从厂家生成取得，确定无误后再进行测试. 防止升级出错变砖.
+> OTA升级文件必须由设备厂家提供. 升级前先通过 [3.2.1.3 获取设备信息](#3213-获取设备信息) 读取 `FirmVersionBean.deviceClazz`, 并与升级文件适用的设备型号进行对比. 只有两个型号完全一致时才能升级; 型号不一致时禁止升级, 防止设备因错误固件变砖.
+
+升级前校验:
+
+| 校验内容 | 数据来源 | 要求 |
+| -------- | -------- | ---- |
+| 当前设备型号 | `FirmVersionBean.deviceClazz` | 通过 `getFirmwareVersionJL()` 获取 |
+| 升级文件适用型号 | 设备厂家提供 | 必须与当前设备的 `deviceClazz` 完全一致 |
+| 当前固件版本 | `FirmVersionBean.deviceNo` | 可用于判断是否需要升级 |
 
 方法说明:
 
@@ -1872,20 +1941,50 @@ DHBleSdk.syncHealthDataByType(Constants.RingHealthType.TODAY_STEP, this)
 调用示例:
 
 ```kotlin
-val otaPath = "" //bin文件,厂家提供
-DHBleSdk.ringOtaWithFileData(otaPath, object : OnFileTransferCallback {
+val otaPath = ""        // 固件文件, 由设备厂家提供
+val otaDeviceClazz = "" // 升级文件适用的设备型号, 由设备厂家提供
+
+fun startOta() {
+  DHBleSdk.ringOtaWithFileData(otaPath, object : OnFileTransferCallback {
     override fun onProgress(pro: Float) {
-        Log.e("OTA", "progress: $pro")
+      Log.e("OTA", "progress: $pro")
     }
 
     override fun onFinish() {
-        Log.e("OTA", "OTA finish")
+      Log.e("OTA", "OTA finish")
     }
 
     override fun onFail(code: Int) {
-        Log.e("OTA", "OTA fail: $code")
+      Log.e("OTA", "OTA fail: $code")
     }
-})
+  })
+}
+
+val firmwareCallback = object : FirmwareCallback {
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    DHBleSdk.dispose(this)
+    Log.e("OTA", "firmware info get failed, errorCode=$errorCode")
+  }
+
+  override fun onResult(data: FirmVersionBean?) {
+    DHBleSdk.dispose(this)
+
+    val deviceClazz = data?.deviceClazz.orEmpty()
+    if (deviceClazz.isBlank() || otaDeviceClazz.isBlank() || deviceClazz != otaDeviceClazz) {
+      Log.e("OTA", "device model mismatch: device=$deviceClazz, firmware=$otaDeviceClazz")
+      return
+    }
+
+    startOta()
+  }
+}
+
+// 先获取设备信息并校验型号, 校验通过后才开始OTA
+DHBleSdk.subscribeData(firmwareCallback)
+DHBleSdk.getFirmwareVersionJL()
 ```
 
  
@@ -2119,13 +2218,22 @@ private val sportResult3Callback by lazy {
 
 #### 5.2.5 传感器原始数据
 
-> PPG/ACC/PPG Red/IR传感器原始数据采集与睡眠实时数据;
->
-> 配置表属性: `isSupportSensorRawPPG` (PPG), `isSupportSensorRawACC` (ACC), `isSupportSensorRawPPGRed` (PPG Red), `isSupportSensorRawIR` (IR), `isSupportSensorRawSleep` (睡眠实时数据);
->
-> **注意: 睡眠实时数据(sensorType=5)无需手动启动与关闭, 设备支持此功能时会在睡眠过程中自动推送, 通过相同的 `SensorRawDataCallback` 回调接收即可.**
+本节包含两种不同的数据方式:
 
-sensorType 合法组合:
+| 数据 | 获取方式 | 说明 |
+| ---- | -------- | ---- |
+| PPG/ACC/PPG Red/IR原始数据 | 历史获取 | APP控制设备开始/停止采集, 采集完成后主动同步历史数据 |
+| 睡眠状态数据 | 实时推送 | 设备在睡眠过程中自动推送, APP只需订阅回调 |
+
+> [!IMPORTANT]
+>
+> PPG/ACC/PPG Red/IR原始数据不支持实时推送, 仅支持历史方式获取; 睡眠状态数据只使用实时推送, 不通过历史原始数据接口获取.
+>
+> 当前历史原始数据采样率最高可达100Hz, 最多支持约1分钟测试数据. 每个采样点不单独记录时间戳, 无法还原每个采样点的绝对时间.
+>
+> 配置表属性: `isSupportSensorRawPPG` (PPG), `isSupportSensorRawACC` (ACC), `isSupportSensorRawPPGRed` (PPG Red), `isSupportSensorRawIR` (IR), `isSupportSensorRawSleep` (睡眠实时数据).
+
+PPG/ACC/PPG Red/IR历史采集的 `sensorType` 合法组合:
 
 | 值   | 含义              | 说明                    |
 | ---- | ----------------- | ----------------------- |
@@ -2140,25 +2248,8 @@ sensorType 合法组合:
 | 13   | 红光 + ACC + 红外 | 红光、ACC与红外同时输出 |
 
 > **规则: 绿光与红光不能共存; 红外不能单独启动,必须与绿光或红光组合使用.**
-
-返回数据格式说明:
-
-| 字段           | 类型                | 说明                                    |
-| -------------- | ------------------- | --------------------------------------- |
-| type           | int                 | 数据类型: 1=PPG, 2=ACC, 3=PPG Red, 4=IR, 5=睡眠实时数据 |
-| ppgDataList    | List\<Integer\>     | PPG数据列表, 每项为int32               |
-| accDataList    | List\<AccRawItem\>  | ACC数据列表, 每项包含x,y,z (int16)     |
-| ppgRedDataList | List\<Integer\>     | PPG Red数据列表, 每项为int32           |
-| irDataList     | List\<Integer\>     | IR红外数据列表, 每项为int32            |
-| sleepDataList  | List\<long[]\>      | type=5时的睡眠数据列表, 每项[0]=时间戳(秒), [1]=睡眠模式: 17=睡眠开始, 34=睡眠结束, 1=深睡, 2=浅睡, 3=清醒, 4=REM |
-
-AccRawItem 数据说明:
-
-| 字段 | 类型 | 说明          |
-| ---- | ---- | ------------- |
-| x    | int  | X轴值 (int16) |
-| y    | int  | Y轴值 (int16) |
-| z    | int  | Z轴值 (int16) |
+>
+> **注意:** 控制接口的 `sensorType` 是传感器按位组合值, 返回对象的 `type` 是数据类型, 两者编号定义不同. 例如 `sensorType=1` 表示开启ACC, 而历史数据 `type=1` 表示PPG; `sensorType=5` 表示红光+ACC, 而睡眠实时数据 `type=5` 表示睡眠状态.
 
 
 ##### 5.2.5.0 PPG定时监测
@@ -2203,6 +2294,8 @@ DHBleSdk.getTimedPPGJL()
 
 ##### 5.2.5.1 启动与关闭传感器原始数据
 
+> 本接口仅用于控制PPG/ACC/PPG Red/IR历史原始数据采集, 睡眠实时数据无需调用此接口.
+>
 > 订阅 `SensorRawControlCallback` 获取启动/关闭结果;
 >
 > 设备也可能主动停止传感器, 此时通过 `SensorRawControlCallback.onResult(reason)` 通知, reason为停止原因(1字节).
@@ -2245,66 +2338,35 @@ private val sensorRawControlCallback by lazy {
 ```
 
 
-##### 5.2.5.2 数据获取方式
+##### 5.2.5.2 历史原始数据获取
 
-> 传感器原始数据有两种获取方式, **由设备端决定使用哪种,APP不可选择**:
+> PPG/ACC/PPG Red/IR原始数据仅支持历史方式获取. 设备先采集并保存数据, APP后续通过 `ringGetHistorySensorRaw()` 主动同步获取;
 >
-> (1) 实时推送: 启动后设备实时推送数据到APP;
->
-> (2) 历史获取: 设备先采集保存,APP后续主动同步获取;
-
-###### 5.2.5.2.1 实时推送
-
-> 启动传感器后, 设备实时推送原始数据;
->
-> 订阅 `SensorRawDataCallback` 获取实时数据; 数据通过 `SensorRawDataBean` 返回.
-
-调用示例:
-
-```kotlin
-//订阅传感器原始数据回调
-DHBleSdk.subscribeData(sensorRawDataCallback)
-
-//开启
-DHBleSdk.ringControlSensorRaw(1, 3)
-
-//监听传感器原始数据
-private val sensorRawDataCallback by lazy {
-    object : SensorRawDataCallback {
-        override fun onResult(data: SensorRawDataBean?) {
-            data?.let {
-                when (it.type) {
-                    2 -> Log.e("RWSDK", "ACC count=" + it.accDataList.size)
-                    1 -> Log.e("RWSDK", "PPG count=" + it.ppgDataList.size)
-                    3 -> Log.e("RWSDK", "PPG Red count=" + it.ppgRedDataList.size)
-                    4 -> Log.e("RWSDK", "IR count=" + it.irDataList.size)
-                    5 -> Log.e("RWSDK", "Sleep count=" + it.sleepDataList.size)
-                }
-            }
-        }
-        override fun onFail(errorCode: Int) {}
-        override fun onSuccess() {}
-    }
-}
-```
-
-###### 5.2.5.2.2 历史获取
-
-> 获取设备保存的传感器历史原始数据, 类似多运动数据同步方式;
->
-> 订阅 `SensorHistoryRawCallback` 获取数据, `onSuccess` 表示同步完成, `onResult` 返回每包数据.
+> 订阅 `SensorHistoryRawCallback` 获取数据, `onResult` 返回历史原始数据列表, `onSuccess` 表示同步完成.
 
 方法说明:
 
 `fun ringGetHistorySensorRaw()`
 
-SensorHistoryRawBean 额外字段:
+SensorHistoryRawBean 字段说明:
 
-| 字段     | 类型 | 说明 |
-| -------- | ---- | ---- |
-| sequence | int  | 序号 |
+| 字段           | 类型               | 说明                                      |
+| -------------- | ------------------ | ----------------------------------------- |
+| type           | int                | 数据类型: 1=PPG, 2=ACC, 3=PPG Red, 4=IR |
+| sequence       | int                | 数据包序号, 从1开始, 每返回一个数据包递增一次; 多个传感器共用同一序号 |
+| ppgDataList    | List\<Integer\>    | PPG数据列表, 每项为int32                  |
+| accDataList    | List\<AccRawItem\> | ACC数据列表, 每项包含x、y、z (int16)      |
+| ppgRedDataList | List\<Integer\>    | PPG Red数据列表, 每项为int32              |
+| irDataList     | List\<Integer\>    | IR红外数据列表, 每项为int32               |
 
-> 其余字段(type, timestamp, ppgDataList, accDataList等)与实时推送一致.
+AccRawItem 字段说明:
+
+| 字段 | 类型 | 说明          |
+| ---- | ---- | ------------- |
+| x    | int  | X轴值 (int16) |
+| y    | int  | Y轴值 (int16) |
+| z    | int  | Z轴值 (int16) |
+
 > onResult 返回 `List<SensorHistoryRawBean>`，包含所有传感器历史记录。
 
 调用示例:
@@ -2324,6 +2386,65 @@ private val sensorHistoryRawCallback by lazy {
         override fun onFail(errorCode: Int) {}
         override fun onSuccess() { Log.e("RWSDK", "SensorHistory sync finished") }
     }
+}
+```
+
+##### 5.2.5.3 睡眠状态实时推送
+
+> 睡眠状态数据只支持实时推送. 无需调用 `ringControlSensorRaw()` 启动或关闭; 设备支持此功能时, 会在睡眠过程中自动推送.
+>
+> 配置表属性: `isSupportSensorRawSleep`.
+>
+> 订阅 `SensorRawDataCallback` 获取睡眠状态数据, 返回对象为 `SensorRawDataBean`.
+
+返回说明:
+
+| SensorRawDataBean字段 | 类型           | 说明 |
+| --------------------- | -------------- | ---- |
+| type                  | int            | 固定为5, 表示睡眠状态数据 |
+| sleepDataList         | List\<long[]\> | 睡眠状态列表, 每项[0]=Unix时间戳(秒), [1]=睡眠模式 |
+
+睡眠模式:
+
+| 值 | 说明 |
+| -- | ---- |
+| 17 | 睡眠开始 |
+| 34 | 睡眠结束 |
+| 1  | 深睡 |
+| 2  | 浅睡 |
+| 3  | 清醒 |
+| 4  | REM |
+
+调用示例:
+
+```kotlin
+private val sleepRawDataCallback = object : SensorRawDataCallback {
+    override fun onResult(data: SensorRawDataBean?) {
+        if (data?.type == 5) {
+            data.sleepDataList.forEach { item ->
+                val timestamp = item[0]
+                val sleepMode = item[1]
+                Log.e("RWSDK", "sleep timestamp=$timestamp mode=$sleepMode")
+            }
+        }
+    }
+
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "sleep data failed, errorCode=$errorCode")
+    }
+
+    override fun onSuccess() {
+    }
+}
+
+// 初始化时调用
+fun registerSleepRawDataCallback() {
+    DHBleSdk.subscribeData(sleepRawDataCallback)
+}
+
+// 不再接收时调用
+fun unregisterSleepRawDataCallback() {
+    DHBleSdk.dispose(sleepRawDataCallback)
 }
 ```
 
@@ -2376,7 +2497,7 @@ private val sensorHistoryRawCallback by lazy {
 - 修复设备计数长按清零时回调`onSuccess`而非`onResult`问题
 
 **v2.0.0_20260408** (2026.04.08)
-- 添加传感器原始数据历史获取功能(5.2.5.2.2)
+- 添加传感器原始数据历史获取功能(5.2.5.2)
 - 添加闹钟震动时长设置(3.2.1.20)
 - 添加触摸事件通知(3.2.1.21)
 

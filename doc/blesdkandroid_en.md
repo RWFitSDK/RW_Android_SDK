@@ -302,81 +302,85 @@ persionBean.age = 20
 DHBleSdk.setUserInfo(persionBean)
 ```
 
-##### 3.2.1.3 Obtaining Device Information
+##### 3.2.1.3 Get Device Information
 
-> Interface Description: Obtain firmware model, firmware version number, and UI version number;
+> Get the device model, firmware version, screen information, and UI version.
 >
-> Subscribe to `FirmwareCallback` to get the results.
+> Subscribe to `FirmwareCallback` to receive the result.
+
+Method Description:
+
+`fun getFirmwareVersionJL()`
+
+Return Value:
+
+| FirmVersionBean property | Type   | Description                                      |
+| ------------------------ | ------ | ------------------------------------------------ |
+| deviceClazz              | String | Device model, the unique identifier for each product model |
+| deviceNo                 | String | Firmware version                                 |
+| screenType               | int    | Screen type: 0. square, 1. round                 |
+| screenWidth              | int    | Screen width                                     |
+| screenHeight             | int    | Screen height                                    |
+| uiVersion                | String | UI version                                       |
+
+> **Important:** Before a firmware upgrade, verify that the device's `deviceClazz` matches the device model supported by the firmware package. Proceed with the upgrade only when they match. Do not upgrade if they do not match.
+
+Example of usage:
 
 ```kotlin
-//1. Subscribe to LoginDeviceCallback callback
 DHBleSdk.subscribeData(object : FirmwareCallback {
-    override fun onSuccess() {
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "firmware info get failed, errorCode=$errorCode")
+  }
+
+  override fun onResult(data: FirmVersionBean?) {
+    data?.let {
+      Log.e("RWSDK", "firmware info --> $it")
     }
-    override fun onFail(errorCode: Int) {
-        onAppend("ERROR CODE $errorCode")
-    }
-    override fun onResult(data: FirmVersionBean?) {
-        data?.let {
-            onAppend("Firmware Version --> \n$it")
-        }
-    }
+  }
 })
 
-
-//2. Send data, the result will be obtained in FirmwareCallback.
 DHBleSdk.getFirmwareVersionJL()
-
-//3. Unsubscribe
-DHBleSdk.dispose(FirmwareCallback)
-
-//FirmVersionBean entity class
-public class FirmVersionBean extends BleSendBean {
-    private String deviceClazz = "";//Device model
-    private String deviceNo = "1.0.0"; //Device version number
-    private int screenType; //0 square, 1 round
-    private int screenWidth; //Device width
-    private int screenHeight; //Device height
-    private String uiVersion; //UI version number
-}
 ```
 
-##### 3.2.1.4 **Get Battery Level**
+##### 3.2.1.4 Get Battery Level
 
-> Interface Description: The app retrieves the device's battery level.
+> Get the device's battery level.
 >
-> Subscribe to `PowerCallback` to get the result.
+> Subscribe to `PowerCallback` to receive the result.
+
+Method Description:
+
+`fun getPowerJL()`
+
+Return Value:
+
+| PowerBean property | Type | Description                    |
+| ------------------ | ---- | ------------------------------ |
+| power              | int  | Remaining battery level, 0-100 |
+
+Example of usage:
 
 ```kotlin
-//1. Subscribe to the PowerCallback callback
 DHBleSdk.subscribeData(object : PowerCallback {
   override fun onSuccess() {
   }
 
   override fun onFail(errorCode: Int) {
-    onAppend("ERROR CODE $errorCode")
+    Log.e("RWSDK", "power get failed, errorCode=$errorCode")
   }
 
   override fun onResult(data: PowerBean?) {
     data?.let {
-      onAppend("Device battery level --> \n$it")
+      Log.e("RWSDK", "power --> $it")
     }
   }
 })
 
-
-//2. Send data, the result will be obtained in PowerCallback.
 DHBleSdk.getPowerJL()
-
-//3. Unsubscribe
-DHBleSdk.dispose(PowerCallback)
-
-//PowerBean entity class
-public class PowerBean implements Parcelable {
-  private boolean isLowPower; // Low power status
-  private int powerStatus; // Charging status, 0 not charging, 1 charging, 2 charging complete
-  private int power; // Battery level 0-100
-}
 ```
 
 ##### 3.2.1.5 Getting and Setting Video Control Switch
@@ -440,64 +444,116 @@ tBrightScreenLedBean.lcdLevel = 3 //1-3Level: 1 low 2 mid 3 high
 DHBleSdk.setRingLedLevel(tBrightScreenLedBean)
 ```
 
-##### 3.2.1.7 Getting and Setting Wearing Position
+##### 3.2.1.7 Get and Set Wearing Position
 
-> Configuration table attribute: `isWearDir`;
+> Get or set the hand on which the ring is worn.
 >
-> Subscribe to `WearHandCallback` to get the result.
+> Function table property: `isWearDir`.
+>
+> Subscribe to `WearHandCallback` to receive the result.
+
+Method Description:
+
+`fun getRingWearDir()`
+
+`fun setRingWearHand(isOpen: Boolean)`
+
+Parameter Description:
+
+| Parameter | Type    | Description      | Value                              |
+| --------- | ------- | ---------------- | ---------------------------------- |
+| isOpen    | Boolean | Wearing position | false. left hand, true. right hand |
+
+Return Value:
+
+| FactoryInBean property | Type | Description                            |
+| ---------------------- | ---- | -------------------------------------- |
+| isOpen                 | int  | Wearing position: 0. left, 1. right    |
+
+Example of usage:
 
 ```kotlin
-// Get wearing position
-DHBleSdk.subscribeData(ringWearHandCallback)
-DHBleSdk.getRingWearDir()
+val wearHandCallback = object : WearHandCallback {
+  override fun onSuccess() {
+    Log.e("RWSDK", "wear hand operation success")
+  }
 
-// Set wearing position
-DHBleSdk.subscribeData(ringWearHandCallback)
-DHBleSdk.setRingWearHand(false) // False is left hand, true is right hand
-```
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "wear hand operation failed, errorCode=$errorCode")
+  }
 
-##### 3.2.1.8 Starting and Stopping Photo Taking
-
-> After starting the photo taking function, the device can control the app's custom camera to take photos through gestures.
->
-> Subscribe to `TakePhotoCallback` to receive photo taking notifications from the device.
->
-> Configuration table attribute: `isTakePhoto`;
-
-```kotlin
-// APP enters the camera interface. 1 controls the device to enter the corresponding interface, 0 controls the device to exit.
-DHBleSdk.subscribeData(takePhotoCallback)
-DHBleSdk.controlTakePhotoJL(1) // Open Photo
-
-// 0 controls the device to exit
-DHBleSdk.dispose(takePhotoCallback)
-DHBleSdk.controlTakePhotoJL(0) // Close photo taking
-
-// Listen for photo taking commands from the device
-/**
-* Camera control monitoring
-*/
-private val takePhotoCallback by lazy {
-  object : TakePhotoCallback {
-    override fun onSuccess() {
-      Log.e("RWSDK", "Output: TakePhotoCallback onSuccess")
-    }
-
-    override fun onFail(errorCode: Int) {
-
-    }
-
-    override fun onResult(data: Int?) {
-      Log.e("RWSDK", "Output: TakePhotoCallback onResult " + data)
-      data.let {
-        when (it){
-          2 -> {
-            // TODO Start the phone's custom camera to take photos
-          }
-        }
-      }
+  override fun onResult(data: FactoryInBean?) {
+    data?.let {
+      Log.e("RWSDK", "wear hand=${it.isOpen()}")
     }
   }
+}
+
+DHBleSdk.subscribeData(wearHandCallback)
+
+// Get wearing position
+DHBleSdk.getRingWearDir()
+
+// Set wearing position to the left hand
+DHBleSdk.setRingWearHand(false)
+
+// Set wearing position to the right hand
+DHBleSdk.setRingWearHand(true)
+```
+
+##### 3.2.1.8 Start and Stop Photo Taking
+
+> Enable photo control when the APP enters its custom camera page. Once enabled, the device can notify the APP through gestures to take a photo. Disable photo control when the APP exits the camera page.
+>
+> Function table property: `isTakePhoto`.
+>
+> Subscribe to `TakePhotoCallback` to receive photo notifications from the device.
+
+Method Description:
+
+`fun controlTakePhotoJL(controlType: Int)`
+
+Parameter Description:
+
+| Parameter   | Type | Description   | Value                              |
+| ----------- | ---- | ------------- | ---------------------------------- |
+| controlType | Int  | Photo control | 0. disable photo, 1. enable photo  |
+
+Return Value:
+
+| Callback data | Type | Description                         |
+| ------------- | ---- | ----------------------------------- |
+| data          | Int  | 2. device notifies the APP to take a photo |
+
+Example of usage:
+
+```kotlin
+private val takePhotoCallback = object : TakePhotoCallback {
+  override fun onSuccess() {
+    Log.e("RWSDK", "take photo control success")
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "take photo control failed, errorCode=$errorCode")
+  }
+
+  override fun onResult(data: Int?) {
+    if (data == 2) {
+      // The device sends a photo notification. Take a photo here using the APP's custom camera.
+    }
+  }
+}
+
+// Call when the APP enters the camera page.
+fun onCameraPageOpened() {
+  DHBleSdk.subscribeData(takePhotoCallback)
+  DHBleSdk.controlTakePhotoJL(1)
+}
+
+// Call when the APP exits the camera page.
+fun onCameraPageClosed() {
+  DHBleSdk.controlTakePhotoJL(0)
+  DHBleSdk.dispose(takePhotoCallback)
 }
 ```
 
@@ -1038,6 +1094,8 @@ DHBleSdk.getAlarmVibrationDuration()
 > Device touch event notification, actively reported by the device. Touch operations are reported regardless of screen state. The APP defines the response behavior.
 >
 > Subscribe to `TouchEventCallback` to receive touch events.
+>
+> **Note:** This is a device-side customization. Before using it, confirm that the device manufacturer has integrated and enabled it in the firmware. If it has not been customized or enabled, the APP will not receive touch event notifications.
 
 TouchEventCallback returns int[] data:
 
@@ -1661,8 +1719,6 @@ public interface HealthDataSyncCallback {
 
   void onSyncBloodSugar(List<BloodSugarSyncBean> var1); // Blood sugar
 
-  void onSyncBreath(List<BreatheSyncBean> var1);
-
   void onSyncHrv(List<HrvSyncBean> var1); // HRV
 
   void onSyncMuslimCount(List<MuslimCountSyncBean> var1); // Dhikr count
@@ -1696,123 +1752,152 @@ DHBleSdk.syncHealthDataByType(Constants.RingHealthType.TODAY_STEP, this)
 
 ##### 3.2.2.4 All-Day Monitoring - Health Data Description
 
-1. Today's and historical step count data void onSyncStep(List<StepSyncBean> var1)
+`HealthDataSyncCallback` returns a date-based list for each health data type. Each date object provides that day's measurement details through `items`.
+
+> [!IMPORTANT]
+>
+> In this section, `time`, `timeMills`, `timestamp`, `asleepTime`, and `awakeTime` are Unix timestamps in seconds. `timeMills` is a legacy field name and does not represent milliseconds. Multiply it by `1000` when converting it to a Java timestamp in milliseconds.
+
+###### 3.2.2.4.1 Health Data Callback Overview
+
+| Health data | Callback | Date object | Detail object | Description |
+| ----------- | -------- | ----------- | ------------- | ----------- |
+| Steps | `onSyncStep` | `StepSyncBean` | `StepItemBean` | Today's and historical steps may be returned in two callbacks |
+| Sleep | `onSyncSleep` | `SleepSyncBean` | `SleepItemBean` | Returns multiple days of sleep data stored on the device |
+| Heart rate | `onSyncHr` | `HeartRateSyncBean` | `HeartRateItemBean` | Grouped by date |
+| Blood pressure | `onSyncBp` | `BloodPressSyncBean` | `BloodPressItemBean` | Grouped by date |
+| Blood oxygen | `onSyncBo` | `BloodOxySyncBean` | `BloodOxyItemBean` | Grouped by date |
+| Body temperature | `onSyncTemp` | `BodyTempSyncBean` | `BodyTempItemBean` | Grouped by date |
+| Stress | `onSyncPressure` | `PressureSyncBean` | `PressureItemBean` | Grouped by date |
+| Blood sugar | `onSyncBloodSugar` | `BloodSugarSyncBean` | `BloodSugarItemBean` | Grouped by date |
+| HRV | `onSyncHrv` | `HrvSyncBean` | `HrvItemBean` | Grouped by date |
+| Dhikr count | `onSyncMuslimCount` | `MuslimCountSyncBean` | `MuslimCountItemBean` | Includes the daily total and hourly details |
+
+Except for steps, sleep, and Dhikr count, the date objects share the following basic structure:
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| time | long | Date timestamp in Unix seconds |
+| itemCount | int | Number of details for the day |
+| items | List | Measurement details for the day |
+
+###### 3.2.2.4.2 Standard Measurement Details
+
+Standard measurement details use `timeMills` as the measurement time in Unix seconds. Their value fields are listed below:
+
+| Data | Detail object | Value field | Unit/conversion |
+| ---- | ------------- | ----------- | --------------- |
+| Heart rate | `HeartRateItemBean` | `hr` | bpm |
+| Blood pressure | `BloodPressItemBean` | `sp` (systolic), `dp` (diastolic) | mmHg |
+| Blood oxygen | `BloodOxyItemBean` | `bloodOxy` | % |
+| Body temperature | `BodyTempItemBean` | `temp` | Actual temperature = `temp / 10`°C; for example, 365 means 36.5°C |
+| Stress | `PressureItemBean` | `pressure` | Device stress value, unitless |
+| Blood sugar | `BloodSugarItemBean` | `sugar` | `float`; do not process it as an integer |
+| HRV | `HrvItemBean` | `hrv` | ms |
 
 > [!CAUTION]
 >
-> If there is historical data, the callback will be triggered twice. The first time is for today's data, which will only contain one day's data; the second time is for historical step count data, which may return data for multiple days;
+> Blood pressure contains two values, `sp` and `dp`, and must not be processed as a single value. Blood sugar `sugar` is a `float` and must not be processed as an integer.
+
+###### 3.2.2.4.3 Step Data
+
+Callback: `onSyncStep(List<StepSyncBean> data)`
+
+> [!CAUTION]
+>
+> If the device contains historical step data, `onSyncStep` is called twice. The first callback returns today's steps and normally contains one `StepSyncBean`. The second callback returns historical steps and may contain multiple dates.
 
 Both today's and historical step data use `StepSyncBean`:
 
-| Data | Callback content | `items` content | Daily totals |
-| ---- | ---------------- | --------------- | ------------ |
-| Today | First callback, normally one `StepSyncBean` | Actual details returned by the device for today | Uses the daily total steps, calories, and distance returned by the device |
-| History | Second callback, possibly multiple dated `StepSyncBean` objects | Actual device details grouped by date | Sums the historical details for steps, calories, and distance |
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| time | long | Date timestamp in Unix seconds |
+| totalSteps | int | Total steps for the day |
+| totalCalorie | int | Total calories for the day, cal |
+| totalDistance | int | Total distance for the day, m |
+| itemCount | int | Number of details |
+| activityDataInterval | int | Step detail interval in minutes; defaults to 60 when unconfigured |
+| items | `List<StepItemBean>` | Actual step details returned by the device |
 
-```java
-public class StepSyncBean {
-  private long time; // Date timestamp
-  private int totalSteps; // Total steps
-  private int totalCalorie; // Total calories (cal)
-  private int totalDistance; // Total distance (m)
-  private int itemCount; // Number of data points
-  private int activityDataInterval; // Detail interval in minutes; defaults to 60
-  private List<StepItemBean> items; // Actual step details returned by the device
+`StepItemBean` fields:
 
-  private String date;
-  private String hour;
-}
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| timestamp | long | Detail timestamp in Unix seconds |
+| index | int | Detail index within the day at the current step interval |
+| steps | int | Steps in this detail |
+| calorie | int | Calories in this detail |
+| distance | int | Distance in this detail |
 
-public class StepItemBean {
-  private long timestamp; // Unix timestamp in seconds
-  private int index; // Detail slot within the day at the current step interval
-  private int steps; // Steps
-  private int calorie; // Calories
-  private int distance; // Distance
-}
+| Data | `items` content | Source of daily totals | Detail interval |
+| ---- | --------------- | ---------------------- | --------------- |
+| Today | Actual details returned by the device for today | Uses the total steps, calories, and distance returned by the device | Determined by `activityDataInterval`; supports 10 or 60 minutes |
+| History | Actual device details grouped by date | Sums the steps, calories, and distance in that day's historical details | Fixed at 60 minutes |
 
-```
+`activityDataInterval=60` means one detail per hour, and `10` means one detail every 10 minutes. Use `StepItemBean.timestamp` as the exact detail time.
 
-`activityDataInterval` is the interval, in minutes, between step details in
-`items`. A value of `60` means one detail per hour, and `10` means one detail
-every 10 minutes. The default is `60` when unconfigured. Use `timestamp` as
-the precise detail time.
+###### 3.2.2.4.4 Sleep Data
 
-2. void onSyncSleep(List<SleepSyncBean> var1);
+Callback: `onSyncSleep(List<SleepSyncBean> data)`
 
 > [!CAUTION]
 >
-> Returns all sleep status data for multiple days from the device;
+> Returns multiple days of sleep state data stored on the device.
 
+`SleepSyncBean` fields:
 
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| time | long | Sleep record timestamp in Unix seconds |
+| totalSleepTime | long | Total sleep duration in minutes |
+| asleepTime | long | Sleep start timestamp in Unix seconds |
+| awakeTime | long | Wake-up timestamp in Unix seconds |
+| itemCount | int | Number of sleep state details |
+| items | `List<SleepItemBean>` | Sleep state details |
 
-```java
-public class SleepSyncBean {
-  private long time; // Sleep day timestamp in seconds (s)
-  private long totalSleepTime; // Total sleep duration in minutes (min)
-  private long asleepTime; // Sleep start timestamp
-  private long awakeTime; // Sleep end timestamp
-  private int itemCount; // Number of sleep states
-  private List<SleepItemBean> items; // Detailed sleep state values
-}
+`SleepItemBean` fields:
 
-public class SleepItemBean {
-  private int len; // Duration of the current sleep type in minutes (min)
-  private int sleepType; // Sleep type: 0 for awake, 1 for light sleep, 2 for deep sleep, 3 for REM
-}
-```
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| len | int | Duration of the current sleep state in minutes |
+| sleepType | int | Sleep state: 0. awake, 1. light sleep, 2. deep sleep, 3. REM |
+| isTemporary | int | Data status: 0. final data, 1. temporary data |
 
-3. Heart rate data void onSyncHr(List<HeartRateSyncBean> var1)
+###### 3.2.2.4.5 Dhikr Count Data
 
-> [!CAUTION]
->
-> Returns data for multiple days (today and historical); distinguish between days based on the time.
+Callback: `onSyncMuslimCount(List<MuslimCountSyncBean> data)`
 
+`MuslimCountSyncBean` fields:
 
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| time | long | Date timestamp in Unix seconds |
+| itemCount | int | Number of details for the day |
+| totalCount | int | Total count for the day |
+| items | `List<MuslimCountItemBean>` | Hourly count details for the day |
 
-```java
-public class HeartRateSyncBean {
-  private long time; // Date timestamp
-  int itemCount; // Data quantity
+`MuslimCountItemBean` fields:
 
-  private List<HeartRateItemBean> items; // Data items, corresponding to heart rate values for each day
-}
-
-public class HeartRateItemBean {
-  private long timeMills; // Timestamp
-  private int hr;
-
-  private String date;
-  private String hour;
-}
-```
-
-**Heart Rate Variability (HRV) `HrvSyncBean`, Blood Oxygen `BloodOxySyncBean`, Blood Pressure `BloodPressSyncBean`, Blood Sugar `BloodSugarSyncBean` , Blood Pressure`BloodPressItemBean`are similar to heart rate and will not be described individually.**
-
-4. Dhikr Data void onSyncMuslimCount(List<MuslimCountSyncBean> var1)
-
-```java
-public class MuslimCountSyncBean {
-private long time; // Date timestamp
-private int itemCount; // Data quantity
-private int totalCount; // Total data quantity
-private List<MuslimCountItemBean> items;
-}
-
-public class MuslimCountItemBean {
-private long timeMills; // Test time timestamp (seconds)
-private int count; // Count; cumulative Dhikr count per hour;
-
-private String date;
-private String hour;
-}
-```
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| timeMills | long | Detail timestamp in Unix seconds |
+| count | int | Cumulative count for the corresponding hour |
+| date | String | Detail date |
+| hour | String | Detail hour |
 
 #### 3.2.3 OTA Upgrade
 
-> [!NOTE]
+> [!CAUTION]
 >
-> The OTA update file must be obtained from the manufacturer and tested thoroughly before proceeding with the update. This is to prevent update errors and device malfunction.
+> The OTA firmware file must be provided by the device manufacturer. Before upgrading, follow [3.2.1.3 Get Device Information](#3213-get-device-information) to read `FirmVersionBean.deviceClazz` and compare it with the device model supported by the firmware file. Upgrade only when the two models match exactly. Do not upgrade when they do not match, as using firmware for another model may make the device unusable.
+
+Pre-upgrade validation:
+
+| Check | Data source | Requirement |
+| ----- | ----------- | ----------- |
+| Current device model | `FirmVersionBean.deviceClazz` | Read using `getFirmwareVersionJL()` |
+| Firmware file target model | Provided by the device manufacturer | Must exactly match the current device's `deviceClazz` |
+| Current firmware version | `FirmVersionBean.deviceNo` | Can be used to determine whether an upgrade is required |
 
 Method Description:
 
@@ -1828,20 +1913,50 @@ Parameter Description:
 Example of usage:
 
 ```kotlin
-val otaPath = "" //bin file, provided by manufacturer
-DHBleSdk.ringOtaWithFileData(otaPath, object : OnFileTransferCallback {
+val otaPath = ""        // Firmware file provided by the device manufacturer
+val otaDeviceClazz = "" // Device model supported by the firmware file
+
+fun startOta() {
+  DHBleSdk.ringOtaWithFileData(otaPath, object : OnFileTransferCallback {
     override fun onProgress(pro: Float) {
-        Log.e("OTA", "progress: $pro")
+      Log.e("OTA", "progress: $pro")
     }
 
     override fun onFinish() {
-        Log.e("OTA", "OTA finish")
+      Log.e("OTA", "OTA finish")
     }
 
     override fun onFail(code: Int) {
-        Log.e("OTA", "OTA fail: $code")
+      Log.e("OTA", "OTA fail: $code")
     }
-})
+  })
+}
+
+val firmwareCallback = object : FirmwareCallback {
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    DHBleSdk.dispose(this)
+    Log.e("OTA", "firmware info get failed, errorCode=$errorCode")
+  }
+
+  override fun onResult(data: FirmVersionBean?) {
+    DHBleSdk.dispose(this)
+
+    val deviceClazz = data?.deviceClazz.orEmpty()
+    if (deviceClazz.isBlank() || otaDeviceClazz.isBlank() || deviceClazz != otaDeviceClazz) {
+      Log.e("OTA", "device model mismatch: device=$deviceClazz, firmware=$otaDeviceClazz")
+      return
+    }
+
+    startOta()
+  }
+}
+
+// Get device information first. Start OTA only after the device model matches.
+DHBleSdk.subscribeData(firmwareCallback)
+DHBleSdk.getFirmwareVersionJL()
 ```
 
  
@@ -2063,13 +2178,22 @@ private val sportResult3Callback by lazy {
 
 #### 5.2.5 Sensor Raw Data
 
-> PPG/ACC/PPG Red/IR sensor raw data collection and sleep real-time data;
->
-> Configuration table properties: `isSupportSensorRawPPG` (PPG), `isSupportSensorRawACC` (ACC), `isSupportSensorRawPPGRed` (PPG Red), `isSupportSensorRawIR` (IR), `isSupportSensorRawSleep` (Sleep real-time);
->
-> **Note: Sleep real-time data (sensorType=5) does not require manual start/stop. When the device supports this feature, it will automatically push data during sleep. Receive it via the same `SensorRawDataCallback`.**
+This section covers two different data retrieval methods:
 
-sensorType valid combinations:
+| Data | Retrieval method | Description |
+| ---- | ---------------- | ----------- |
+| PPG/ACC/PPG Red/IR raw data | History retrieval | The APP starts and stops collection, then actively synchronizes the stored data |
+| Sleep state data | Real-time push | The device automatically pushes data during sleep; the APP only needs to subscribe to the callback |
+
+> [!IMPORTANT]
+>
+> PPG/ACC/PPG Red/IR raw data does not support real-time push and is available only through history retrieval. Sleep state data uses only real-time push and is not retrieved through the historical raw data API.
+>
+> The current historical raw data sampling rate can reach up to 100 Hz, with a maximum test duration of approximately one minute. Individual samples do not contain timestamps, so the absolute time of each sample cannot be reconstructed.
+>
+> Function table properties: `isSupportSensorRawPPG` (PPG), `isSupportSensorRawACC` (ACC), `isSupportSensorRawPPGRed` (PPG Red), `isSupportSensorRawIR` (IR), and `isSupportSensorRawSleep` (sleep real-time data).
+
+Valid `sensorType` combinations for PPG/ACC/PPG Red/IR historical collection:
 
 | Value | Meaning              | Description                          |
 | ----- | -------------------- | ------------------------------------ |
@@ -2084,25 +2208,8 @@ sensorType valid combinations:
 | 13    | PPG Red + ACC + IR   | PPG Red, ACC and IR simultaneously   |
 
 > **Rules: PPG Green and PPG Red cannot coexist; IR cannot start alone, must be combined with PPG Green or PPG Red.**
-
-Return Data format:
-
-| Field          | Type               | Description                                |
-| -------------- | ------------------ | ------------------------------------------ |
-| type           | int                | Data type: 1=PPG, 2=ACC, 3=PPG Red, 4=IR, 5=Sleep real-time |
-| ppgDataList    | List\<Integer\>    | PPG data list, each item is int32          |
-| accDataList    | List\<AccRawItem\> | ACC data list, each item has x,y,z (int16) |
-| ppgRedDataList | List\<Integer\>    | PPG Red data list, each item is int32      |
-| irDataList     | List\<Integer\>    | IR infrared data list, each item is int32  |
-| sleepDataList  | List\<long[]\>     | Sleep data list when type=5, each item [0]=timestamp(s), [1]=mode: 17=Start, 34=End, 1=Deep, 2=Light, 3=Awake, 4=REM |
-
-AccRawItem:
-
-| Field | Type | Description     |
-| ----- | ---- | --------------- |
-| x     | int  | X-axis (int16)  |
-| y     | int  | Y-axis (int16)  |
-| z     | int  | Z-axis (int16)  |
+>
+> **Note:** The control API's `sensorType` is a sensor bitmask, while the returned object's `type` is a data type. They use different numbering. For example, `sensorType=1` starts ACC, while historical data `type=1` means PPG. `sensorType=5` starts PPG Red + ACC, while sleep real-time data `type=5` means a sleep state.
 
 
 ##### 5.2.5.0 PPG Timed Monitoring
@@ -2147,6 +2254,8 @@ DHBleSdk.getTimedPPGJL()
 
 ##### 5.2.5.1 Start and Stop Sensor Raw Data
 
+> This API controls only PPG/ACC/PPG Red/IR historical raw data collection. It is not required for sleep real-time data.
+>
 > Subscribe to `SensorRawControlCallback` to receive start/stop results;
 >
 > The device may also stop the sensor actively, notified via `SensorRawControlCallback.onResult(reason)`, where reason is the stop cause (1 byte).
@@ -2189,63 +2298,36 @@ private val sensorRawControlCallback by lazy {
 ```
 
 
-##### 5.2.5.2 Data Retrieval Methods
+##### 5.2.5.2 Historical Raw Data Retrieval
 
-> There are two ways to retrieve sensor raw data. **The device determines which method is used, the APP cannot choose**:
+> PPG/ACC/PPG Red/IR raw data is available only through history retrieval. The device collects and stores the data first, and the APP later actively synchronizes it using `ringGetHistorySensorRaw()`.
 >
-> (1) Real-time push: After starting, the device pushes data to the APP in real-time;
->
-> (2) History retrieval: The device collects and saves data first, then the APP actively syncs it later;
-
-###### 5.2.5.2.1 Real-time Push
-
-> After starting the sensor, the device pushes raw data in real-time;
->
-> Subscribe to `SensorRawDataCallback` to receive real-time data; Data is returned via `SensorRawDataBean`.
-
-Example of usage:
-
-```kotlin
-DHBleSdk.subscribeData(sensorRawDataCallback)
-DHBleSdk.ringControlSensorRaw(1, 3)
-
-private val sensorRawDataCallback by lazy {
-    object : SensorRawDataCallback {
-        override fun onResult(data: SensorRawDataBean?) {
-            data?.let {
-                when (it.type) {
-                    2 -> Log.e("RWSDK", "ACC count=" + it.accDataList.size)
-                    1 -> Log.e("RWSDK", "PPG count=" + it.ppgDataList.size)
-                    3 -> Log.e("RWSDK", "PPG Red count=" + it.ppgRedDataList.size)
-                    4 -> Log.e("RWSDK", "IR count=" + it.irDataList.size)
-                    5 -> Log.e("RWSDK", "Sleep count=" + it.sleepDataList.size)
-                }
-            }
-        }
-        override fun onFail(errorCode: Int) {}
-        override fun onSuccess() {}
-    }
-}
-```
-
-###### 5.2.5.2.2 History Retrieval
-
-> Retrieve historical sensor raw data saved on the device, similar to the multi-sport data sync pattern;
->
-> Subscribe to `SensorHistoryRawCallback` to receive data. `onSuccess` indicates sync is complete, `onResult` returns each data packet.
+> Subscribe to `SensorHistoryRawCallback` to receive data. `onResult` returns the historical raw data list, and `onSuccess` indicates that synchronization is complete.
 
 Method Description:
 
 `fun ringGetHistorySensorRaw()`
 
-SensorHistoryRawBean additional field:
+SensorHistoryRawBean fields:
 
-| Field    | Type | Description     |
-| -------- | ---- | --------------- |
-| sequence | int  | Sequence number |
+| Field          | Type               | Description |
+| -------------- | ------------------ | ----------- |
+| type           | int                | Data type: 1=PPG, 2=ACC, 3=PPG Red, 4=IR |
+| sequence       | int                | Packet sequence starting from 1 and incrementing for every returned packet; all enabled sensors share the same sequence |
+| ppgDataList    | List\<Integer\>    | PPG data list; each item is int32 |
+| accDataList    | List\<AccRawItem\> | ACC data list; each item contains x, y, and z (int16) |
+| ppgRedDataList | List\<Integer\>    | PPG Red data list; each item is int32 |
+| irDataList     | List\<Integer\>    | IR data list; each item is int32 |
 
-> Other fields (type, timestamp, ppgDataList, accDataList, etc.) are the same as real-time push.
-> onResult returns `List<SensorHistoryRawBean>` containing all sensor history records.
+AccRawItem fields:
+
+| Field | Type | Description    |
+| ----- | ---- | -------------- |
+| x     | int  | X-axis (int16) |
+| y     | int  | Y-axis (int16) |
+| z     | int  | Z-axis (int16) |
+
+> `onResult` returns `List<SensorHistoryRawBean>` containing all historical sensor records.
 
 Example of usage:
 
@@ -2264,5 +2346,64 @@ private val sensorHistoryRawCallback by lazy {
         override fun onFail(errorCode: Int) {}
         override fun onSuccess() { Log.e("RWSDK", "SensorHistory sync finished") }
     }
+}
+```
+
+##### 5.2.5.3 Sleep State Real-Time Push
+
+> Sleep state data supports only real-time push. Do not call `ringControlSensorRaw()` to start or stop it. When supported by the device, sleep state data is automatically pushed during sleep.
+>
+> Function table property: `isSupportSensorRawSleep`.
+>
+> Subscribe to `SensorRawDataCallback` to receive sleep state data. The returned object is `SensorRawDataBean`.
+
+Return Value:
+
+| SensorRawDataBean field | Type           | Description |
+| ----------------------- | -------------- | ----------- |
+| type                    | int            | Fixed at 5, indicating sleep state data |
+| sleepDataList           | List\<long[]\> | Sleep state list; each item contains [0]=Unix timestamp in seconds and [1]=sleep mode |
+
+Sleep modes:
+
+| Value | Description |
+| ----- | ----------- |
+| 17    | Sleep start |
+| 34    | Sleep end |
+| 1     | Deep sleep |
+| 2     | Light sleep |
+| 3     | Awake |
+| 4     | REM |
+
+Example of usage:
+
+```kotlin
+private val sleepRawDataCallback = object : SensorRawDataCallback {
+    override fun onResult(data: SensorRawDataBean?) {
+        if (data?.type == 5) {
+            data.sleepDataList.forEach { item ->
+                val timestamp = item[0]
+                val sleepMode = item[1]
+                Log.e("RWSDK", "sleep timestamp=$timestamp mode=$sleepMode")
+            }
+        }
+    }
+
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "sleep data failed, errorCode=$errorCode")
+    }
+
+    override fun onSuccess() {
+    }
+}
+
+// Call during initialization.
+fun registerSleepRawDataCallback() {
+    DHBleSdk.subscribeData(sleepRawDataCallback)
+}
+
+// Call when sleep data is no longer needed.
+fun unregisterSleepRawDataCallback() {
+    DHBleSdk.dispose(sleepRawDataCallback)
 }
 ```
