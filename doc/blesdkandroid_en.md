@@ -414,6 +414,29 @@ DHBleSdk.subscribeData(videoHidCallback)
 DHBleSdk.getVideoHidJL()
 ```
 
+> `VideoHidCallback` only returns the result of setting or reading the control mode. When music mode is enabled with `hidOpen = 3`, also subscribe to `MusicPushSettingCallback` to receive music control commands actively reported by the device.
+
+```kotlin
+val musicPushCallback = object : MusicPushSettingCallback {
+    override fun onResult(data: Int?) {
+        when (data) {
+            3 -> { /* Previous */ }
+            4 -> { /* Next */ }
+        }
+    }
+
+    override fun onFail(errorCode: Int) {}
+    override fun onSuccess() {}
+}
+
+DHBleSdk.subscribeData(musicPushCallback)
+val musicMode = VideoHidBean().apply { hidOpen = 3 }
+DHBleSdk.setVideoHidJL(musicMode)
+
+// Remove the listener when music control events are no longer needed.
+DHBleSdk.dispose(musicPushCallback)
+```
+
 ##### 3.2.1.6 Getting and Setting LED Screen Brightness
 
 > Configuration table attribute: `isLEDLight`;
@@ -804,7 +827,7 @@ DHBleSdk.controlPhoneJL(1)
 
 ###### 3.2.1.14.3 Music Control
 
-> When the device triggers music control (play/pause/previous/next, etc.), the APP should listen for the device command and perform the corresponding action.
+> When the device triggers previous-track or next-track control, the APP should listen for the device command and perform the corresponding action.
 >
 > Subscribe to `MusicPushSettingCallback` to receive device music control events.
 
@@ -812,12 +835,8 @@ MusicPushSettingCallback return values:
 
 | Value | Description    |
 | ----- | -------------- |
-| 1     | Play           |
-| 2     | Pause          |
 | 3     | Previous track |
 | 4     | Next track     |
-| 5     | Volume up      |
-| 6     | Volume down    |
 
 Example of usage:
 
@@ -825,12 +844,8 @@ Example of usage:
 DHBleSdk.subscribeData(object : MusicPushSettingCallback {
     override fun onResult(data: Int?) {
         when (data) {
-            1 -> { /* Play */ }
-            2 -> { /* Pause */ }
             3 -> { /* Previous */ }
             4 -> { /* Next */ }
-            5 -> { /* Volume up */ }
-            6 -> { /* Volume down */ }
         }
     }
     override fun onFail(errorCode: Int) {}

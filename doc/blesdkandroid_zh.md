@@ -409,6 +409,29 @@ DHBleSdk.subscribeData(videoHidCallback)
 DHBleSdk.getVideoHidJL()
 ```
 
+> `VideoHidCallback` 只返回控制模式的设置或读取结果。当 `hidOpen = 3` 开启音乐模式时，还需订阅 `MusicPushSettingCallback` 接收设备主动上报的音乐控制指令。
+
+```kotlin
+val musicPushCallback = object : MusicPushSettingCallback {
+    override fun onResult(data: Int?) {
+        when (data) {
+            3 -> { /* 上一曲 */ }
+            4 -> { /* 下一曲 */ }
+        }
+    }
+
+    override fun onFail(errorCode: Int) {}
+    override fun onSuccess() {}
+}
+
+DHBleSdk.subscribeData(musicPushCallback)
+val musicMode = VideoHidBean().apply { hidOpen = 3 }
+DHBleSdk.setVideoHidJL(musicMode)
+
+// 不再接收音乐控制事件时移除监听
+DHBleSdk.dispose(musicPushCallback)
+```
+
 ##### 3.2.1.6 获取与设置LED亮屏强度
 
 > 配置表属性: `isLEDLight` ;
@@ -809,7 +832,7 @@ DHBleSdk.controlPhoneJL(1)
 
 ###### 3.2.1.14.3 音乐控制
 
-> 设备端触发音乐控制(播放/暂停/上一曲/下一曲等)时, APP需监听设备指令并执行对应操作.
+> 设备端触发上一曲或下一曲控制时, APP需监听设备指令并执行对应操作.
 >
 > 订阅 `MusicPushSettingCallback` 接收设备音乐控制事件.
 
@@ -817,12 +840,8 @@ MusicPushSettingCallback 返回值说明:
 
 | 值   | 说明     |
 | ---- | -------- |
-| 1    | 播放     |
-| 2    | 暂停     |
 | 3    | 上一曲   |
 | 4    | 下一曲   |
-| 5    | 音量加   |
-| 6    | 音量减   |
 
 调用示例:
 
@@ -830,12 +849,8 @@ MusicPushSettingCallback 返回值说明:
 DHBleSdk.subscribeData(object : MusicPushSettingCallback {
     override fun onResult(data: Int?) {
         when (data) {
-            1 -> { /* 播放 */ }
-            2 -> { /* 暂停 */ }
             3 -> { /* 上一曲 */ }
             4 -> { /* 下一曲 */ }
-            5 -> { /* 音量加 */ }
-            6 -> { /* 音量减 */ }
         }
     }
     override fun onFail(errorCode: Int) {}

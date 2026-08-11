@@ -22,6 +22,7 @@ import com.example.blesdk.callback.data.HealthDataBroCallback
 import com.example.blesdk.callback.data.PowerCallback
 import com.example.blesdk.callback.data.TakePhotoCallback
 import com.example.blesdk.callback.status.HealthDataControlCallback
+import com.example.blesdk.callback.status.MusicPushSettingCallback
 import com.example.blesdk.utils.Constants
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -100,6 +101,22 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
         }
     }
 
+    /** 音乐模式下设备主动上报的控制事件；当前仅支持上一曲和下一曲。 */
+    private val musicPushSettingCallback = object : MusicPushSettingCallback {
+        override fun onResult(data: Int?) {
+            when (data) {
+                3 -> Log.e("RWSDK", "MusicPushSettingCallback: previous track, command=3")
+                4 -> Log.e("RWSDK", "MusicPushSettingCallback: next track, command=4")
+            }
+        }
+
+        override fun onSuccess() = Unit
+
+        override fun onFail(errorCode: Int) {
+            Log.e("RWSDK", "MusicPushSettingCallback failed, errorCode=$errorCode")
+        }
+    }
+
     fun attach(context: Context) {
         appContext = context.applicationContext
         DHBleSdk.setConnectBleCallback(this)
@@ -108,6 +125,7 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
             DHBleSdk.subscribeData(realtimeCallback)
             DHBleSdk.subscribeData(measurementCallback)
             DHBleSdk.subscribeData(takePhotoCallback)
+            DHBleSdk.subscribeData(musicPushSettingCallback)
         }
         refreshFromApplication()
     }
