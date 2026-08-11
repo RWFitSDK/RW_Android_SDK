@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="demo_health">健康</string>
+    <string name="demo_device">设备</string>
+    <string name="demo_health_data">健康数据</string>
+    <string name="demo_pull_to_sync">下拉同步</string>
+    <string name="demo_health_empty">连接设备后，将按功能表显示支持的健康项目</string>
+    <string name="demo_search_device">搜索设备</string>
+    <string name="demo_scan_devices">搜索设备</string>
+    <string name="demo_unbind_device">解绑设备</string>
+    <string name="demo_reconnect">重连</string>
+    <string name="demo_disconnect">断开</string>
+    <string name="demo_back">返回</string>
+    <string name="demo_refresh">刷新</string>
+    <string name="demo_stop">停止</string>
+    <string name="demo_device_info">设备信息</string>
+    <string name="demo_battery">电量</string>
+    <string name="demo_device_model">设备型号</string>
+    <string name="demo_firmware_version">固件版本</string>
+    <string name="demo_device_features">设备功能 · 按功能表显示</string>
+    <string name="demo_settings_empty">连接并获取功能表后显示设备设置</string>
+    <string name="demo_latest">最近一次</string>
+    <string name="demo_single_measurement">单次实时检测</string>
+    <string name="demo_not_started">未开始</string>
+    <string name="demo_start_measurement">开始检测</string>
+    <string name="demo_stop_measurement">结束检测</string>
+    <string name="demo_measuring">检测中</string>
+    <string name="demo_detail_data">明细数据</string>
+    <string name="demo_detail_empty">暂无明细数据，请在首页下拉同步</string>
+    <string name="demo_syncing">正在拉取数据…</string>
+    <string name="demo_syncing_progress">正在拉取数据… %1$d%%</string>
+    <string name="demo_sync_health">同步健康数据</string>
+    <string name="demo_connect_first">请先连接设备</string>
+    <string name="demo_unbound_device">未绑定设备</string>
+    <string name="demo_add_device">添加设备</string>
+    <string name="demo_connected">已连接</string>
+    <string name="demo_connecting">连接中</string>
+    <string name="demo_initializing">正在初始化</string>
+    <string name="demo_saved_not_connected">已保存设备，未连接</string>
+    <string name="demo_not_connected">未连接</string>
+    <string name="demo_disconnected">已断开</string>
+    <string name="demo_password_auth_failed">密码认证失败</string>
+    <string name="demo_connection_disconnected_reason">连接已断开：%1$s</string>
+    <string name="demo_sync_failed">健康数据同步失败：%1$d</string>
+    <string name="demo_no_data">暂无数据</string>
+    <string name="demo_view_details">点击查看详情</string>
+    <string name="demo_sync_or_measure">同步或检测后显示</string>
+    <string name="demo_unbind_message">解绑后将断开设备，并清除Demo中的设备信息和内存健康数据。</string>
+    <string name="demo_cancel">取消</string>
+    <string name="demo_confirm">确定</string>
+    <string name="demo_delete">删除</string>
+    <string name="demo_modify">修改</string>
+    <string name="demo_on">开启</string>
+    <string name="demo_off">关闭</string>
+    <string name="demo_enabled">已开启</string>
+    <string name="demo_disabled">已关闭</string>
+    <string name="demo_tap_to_set">点击设置</string>
+    <string name="demo_execute_now">立即执行</string>
+    <string name="demo_setting_success">设置成功</string>
+    <string name="demo_setting_failed">设置失败：%1$d</string>
+    <string name="demo_seconds_value">%1$d秒</string>
+    <string name="demo_minutes_value">%1$d分钟</string>
+    <string name="demo_every_minutes">每%1$d分钟</string>
+    <string name="demo_count_value">%1$d次</string>
+    <string name="demo_level_value">强度%1$d</string>
+    <string name="demo_level_count_value">强度%1$d · %2$d次</string>
+    <string name="demo_mode_value">模式%1$d</string>
+    <string name="demo_below_percent">低于%1$d%%</string>
+    <string name="demo_switch_title">%1$s开关</string>
+    <string name="demo_interval_title">%1$s间隔</string>
+    <string name="demo_select_start_time">选择开始时间</string>
+    <string name="demo_select_end_time">选择结束时间</string>
+    <string name="demo_not_set">不设置</string>
+    <string name="demo_confirm_operation">确定执行此操作？</string>
+    <string name="demo_health_step">计步</string><string name="demo_health_sleep">睡眠</string><string name="demo_health_heart_rate">心率</string><string name="demo_health_blood_oxygen">血氧</string><string name="demo_health_hrv">HRV</string><string name="demo_health_pressure">压力</string><string name="demo_health_blood_pressure">血压</string><string name="demo_health_blood_sugar">血糖</string><string name="demo_health_temperature">体温</string><string name="demo_health_muslim_count">赞念计数</string>
+    <string name="demo_multi_sport">多运动</string><string name="demo_enter_multi_sport">点击选择运动类型</string><string name="demo_workout_type">运动类型</string>
+    <string name="demo_steps_value">%1$d步</string><string name="demo_step_detail">%1$s · 序号 %2$d · %3$s cal · %4$s m</string><string name="demo_minutes_record">%1$d分钟</string><string name="demo_sleep_record">睡眠记录</string><string name="demo_temporary_data"> · 临时数据</string><string name="demo_systolic_diastolic">收缩压 / 舒张压</string><string name="demo_realtime_measurement">实时检测</string><string name="demo_realtime_data">实时数据</string><string name="demo_deep_sleep">深睡</string><string name="demo_light_sleep">浅睡</string><string name="demo_rem_sleep">快速眼动</string><string name="demo_awake">清醒</string><string name="demo_sleep_state">睡眠状态 %1$d</string>
+    <string name="demo_alarm">闹钟</string><string name="demo_alarm_desc">选择时间与重复方式</string><string name="demo_screen_sleep">屏幕睡眠</string><string name="demo_time_range_desc">设置开关与生效时间段</string><string name="demo_bright_duration">亮屏时长</string><string name="demo_bright_duration_desc">设置0～30秒</string><string name="demo_raise_to_wake">抬腕亮屏</string><string name="demo_video_control">视频控制</string><string name="demo_video_control_desc">关闭、视频、Book、Music</string><string name="demo_led_brightness">LED亮度</string><string name="demo_led_brightness_desc">设置LED开关与亮度</string><string name="demo_wear_position">佩戴位置</string><string name="demo_wear_position_desc">设置左手或右手佩戴</string><string name="demo_find_device">查找设备</string><string name="demo_find_device_desc">让设备发出查找提示</string><string name="demo_camera_control">遥控拍照</string><string name="demo_camera_control_desc">进入或退出拍照模式，接收戒指拍照指令</string>
+    <string name="demo_all_day_heart_rate">全天心率</string><string name="demo_all_day_blood_oxygen">全天血氧</string><string name="demo_all_day_hrv">全天HRV</string><string name="demo_all_day_pressure">全天压力</string><string name="demo_all_day_blood_pressure">全天血压</string><string name="demo_all_day_blood_sugar">全天血糖</string><string name="demo_all_day_temperature">全天体温</string><string name="demo_timed_ppg">PPG定时监测</string><string name="demo_monitor_desc">设置监测开关与间隔</string><string name="demo_sensor_raw_ppg">PPG原始数据</string><string name="demo_sensor_raw_ppg_desc">启动、停止采集或获取历史数据</string><string name="demo_start_ppg">启动PPG</string><string name="demo_stop_ppg">停止PPG</string><string name="demo_get_ppg_history">获取PPG历史</string><string name="demo_sensor_collecting">采集中</string><string name="demo_sensor_stopping">停止中</string><string name="demo_sensor_stop_sent">停止指令已发送</string><string name="demo_sensor_collection_complete">采集完成</string><string name="demo_sensor_ppg_started">PPG已启动</string><string name="demo_ppg_history">PPG历史数据</string><string name="demo_reading_history">正在读取历史数据…</string><string name="demo_ppg_history_summary">%1$d组 · %2$d个采样点</string><string name="demo_ppg_history_result">获取%1$d组，共%2$d个采样点。</string><string name="demo_ppg_history_empty">设备中暂无PPG历史数据。</string><string name="demo_hr_alert">心率报警</string><string name="demo_hr_alert_desc">设置开关及心率上下限</string><string name="demo_bo_alert">血氧报警</string><string name="demo_bo_alert_desc">设置开关及血氧下限</string><string name="demo_vibration_parameters">震动参数</string><string name="demo_vibration_parameters_desc">设置强度与震动次数</string><string name="demo_alarm_vibration_count">闹钟震动次数</string><string name="demo_alarm_vibration_count_desc">设置0～6次</string><string name="demo_vibration_interval">震动间隔</string><string name="demo_vibration_interval_desc">设置100～1000毫秒</string><string name="demo_count_reminder">计数提醒</string><string name="demo_count_reminder_desc">设置计数提醒间隔</string><string name="demo_fall_alert">跌落提醒</string><string name="demo_fall_alert_desc">开启或关闭跌落检测</string><string name="demo_tasbeeh_switch">赞念开关</string><string name="demo_tasbeeh_switch_desc">开启或关闭赞念功能</string><string name="demo_tasbeeh_time_display">赞念时间显示</string><string name="demo_tasbeeh_time_display_desc">选择时间显示模式</string><string name="demo_device_password">设备密码</string><string name="demo_device_password_desc">解绑前可恢复默认密码0000</string><string name="demo_device_management">设备管理</string><string name="demo_device_management_desc">关机、重启或恢复出厂</string>
+    <string name="demo_firmware_upgrade">固件升级</string><string name="demo_firmware_upgrade_desc">选择本地固件文件后启动OTA</string><string name="demo_select_firmware">选择固件</string><string name="demo_ota_demo_title">OTA接入说明</string><string name="demo_ota_demo_message">OTA需要升级固件文件。选择有效文件后，调用 DHBleSdk.ringOtaWithFileData(filePath, callback)。当前Demo入口不实际启动升级。</string>
+    <string name="demo_find_sent">查找指令已发送</string><string name="demo_enter_camera_mode">进入拍照模式</string><string name="demo_exit_camera_mode">退出拍照模式</string><string name="demo_camera_mode_active">拍照模式中</string><string name="demo_camera_mode_exited">已退出</string><string name="demo_video_mode">视频控制模式</string><string name="demo_video">视频</string><string name="demo_brightness_level">亮度%1$d</string><string name="demo_left_hand">左手</string><string name="demo_right_hand">右手</string><string name="demo_low">低</string><string name="demo_medium">中</string><string name="demo_high">高</string><string name="demo_vibration_strength">震动强度</string><string name="demo_vibration_count">震动次数</string><string name="demo_heart_rate_upper">心率上限</string><string name="demo_heart_rate_lower">心率下限</string><string name="demo_blood_oxygen_lower">血氧下限</string><string name="demo_tasbeeh_time_always">每次唤醒先显示时间</string><string name="demo_tasbeeh_time_never">永不显示时间</string><string name="demo_tasbeeh_time_after_sleep">休眠10分钟后显示时间</string><string name="demo_restore_default_password">恢复默认密码</string><string name="demo_restore_default_password_message">正常解绑前，将设备密码修改为0000。</string><string name="demo_password_restored">密码已恢复为0000</string><string name="demo_modify_failed">修改失败：%1$d</string><string name="demo_power_off">关机</string><string name="demo_restart">重启</string><string name="demo_factory_reset">恢复出厂</string>
+    <string name="demo_alarm_management">闹钟管理</string><string name="demo_set_alarm">设置闹钟</string><string name="demo_get_all_alarms">获取全部闹钟</string><string name="demo_delete_all_alarms">删除全部闹钟</string><string name="demo_repeat_schedule">重复方式</string><string name="demo_once">仅一次</string><string name="demo_every_day">每天</string><string name="demo_weekdays">工作日</string><string name="demo_weekends">周末</string><string name="demo_no_alarms">设备中暂无闹钟</string><string name="demo_all_alarms">全部闹钟（%1$d）</string><string name="demo_delete_all_alarms_message">确定删除设备中的全部闹钟？</string><string name="demo_alarm_item">%1$d. %2$s · %3$s · %4$s</string>
+    <string-array name="demo_weekday_names"><item>周日</item><item>周一</item><item>周二</item><item>周三</item><item>周四</item><item>周五</item><item>周六</item></string-array>
+    <string name="demo_ble_cache_error">蓝牙缓存异常，请关闭并重新打开手机蓝牙后重试</string><string name="demo_connection_failed">连接失败，请重试</string>
+</resources>

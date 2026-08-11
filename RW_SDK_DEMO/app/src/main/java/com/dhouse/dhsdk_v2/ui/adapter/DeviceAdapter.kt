@@ -11,6 +11,7 @@ class DeviceAdapter(data : MutableList<BleDevice>) :
     override fun convert(holder: BaseViewHolder, item: BleDevice) {
         holder.setText(R.id.nameTv,item.bleName)
         holder.setText(R.id.macTv,item.bleMac)
+        holder.setText(R.id.rssiTv, "RSSI: ${item.bleRssi} dBm")
     }
 
 }

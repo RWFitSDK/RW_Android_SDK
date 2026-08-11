@@ -156,11 +156,11 @@ DHBleSdk.connectDeviceWithModel(bleDevice)
 
 // 3. Implement and receive callbacks for Bluetooth connection status.
 interface RingConnectBleCallback {
-  fun onRingConnecting()
-  fun onRingConnected()
-  fun onRingConnectFailed(reason: RingBleError = RingBleError.UNKNOWN)
+  fun onRingConnecting(device: BleDevice?)
+  fun onRingConnected(device: BleDevice?)
+  fun onRingConnectFailed(device: BleDevice?, reason: RingBleError = RingBleError.UNKNOWN)
 
-  fun onRingDidFunctionMenu(supportMenuBean:SupportMenuBean)
+  fun onRingDidFunctionMenu(device: BleDevice?, supportMenuBean: SupportMenuBean)
 }
 ```
 
@@ -170,7 +170,7 @@ interface RingConnectBleCallback {
 | :-------------------- | ------------------------------------------------------------ |
 | onRingConnecting      | Connecting                                                   |
 | onRingConnected       | After calling `connectDeviceWithModel`, the function will return upon successful connection. |
-| onRingConnectFailed   | A callback function will be triggered when the Bluetooth connection is disconnected. |
+| onRingConnectFailed   | Called when connection fails or disconnects. For password authentication failure, `reason` is `PASSWORD_AUTH_FAILED`. |
 | onRingDidFunctionMenu | The function will return after successfully obtaining the device configuration table; business operations should be performed after this point. |
 
 >   [!TIP]
@@ -242,6 +242,7 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportSensorRawSleep     | Does it support sleep real-time data?                        |
 | isSupportFallDetect         | Does it support fall detection alert?                        |
 | isSupportRecording          | Does it support recording function?                          |
+| isSupportDevicePasswordAuth | Does it support device password authentication?              |
 
 
 ### 3.2 Device function operation
@@ -1297,6 +1298,80 @@ private val countReminderCallback by lazy {
 ```
 
 
+
+##### 3.2.1.26 Device Password Authentication
+
+> Check `isSupportDevicePasswordAuth` in the device configuration table to determine whether the device supports password authentication.
+>
+> The password must contain four digits. A `null` or empty value is treated as the default password `0000`.
+>
+> For a supported device, `onRingDidFunctionMenu` is called only after authentication succeeds. If authentication fails, the SDK disconnects and returns `RingBleError.PASSWORD_AUTH_FAILED`. Unsupported devices continue to use the original connection flow.
+
+```mermaid
+flowchart TD
+    A["Password authentication supported?"] -->|No| B["Business-ready<br/>onRingDidFunctionMenu callback"]
+    A -->|Yes| C["Authenticate with the preset password"]
+    C -->|Success| B
+    C -->|Failed: PASSWORD_AUTH_FAILED| D["Disconnect<br/>onRingConnectFailed"]
+```
+
+###### 3.2.1.26.1 Set the Automatic Authentication Password
+
+`fun prepareAutoPassword(password: String?)`
+
+> Set the password used by the SDK for automatic authentication. It may be configured after SDK initialization, but it must be called before connecting.
+
+Input Parameter:
+
+| Parameter  | Type     | Description                                                   |
+| ---------- | -------- | ------------------------------------------------------------- |
+| `password` | `String` | Four-digit password; `null` or an empty string is treated as `0000` |
+
+Callback Result:
+
+| Callback Method          | Result                              | Description                                            |
+| ------------------------ | ----------------------------------- | ------------------------------------------------------ |
+| `onRingDidFunctionMenu`  | `SupportMenuBean`                   | Authentication succeeded; the device is business-ready |
+| `onRingConnectFailed`    | `RingBleError.PASSWORD_AUTH_FAILED` | Authentication failed; the SDK disconnects the device  |
+
+Example:
+
+```kotlin
+DHBleSdk.setConnectBleCallback(this)
+DHBleSdk.prepareAutoPassword("1234")
+DHBleSdk.connectDeviceWithModel(bleDevice)
+
+override fun onRingDidFunctionMenu(device: BleDevice?, supportMenuBean: SupportMenuBean) {
+    Log.e("RWSDK", "Device ready")
+}
+
+override fun onRingConnectFailed(device: BleDevice?, reason: RingBleError) {
+    if (reason == RingBleError.PASSWORD_AUTH_FAILED) {
+        Log.e("RWSDK", "Device password authentication failed")
+    }
+}
+```
+
+###### 3.2.1.26.2 Modify the Device Password
+
+`fun modifyDevicePwd(password: String?, callback: CustomStatusCallback)`
+
+> Modify the device password after the device is connected and authenticated. For a normal unbind operation, first change the password to `0000`; only clear the local binding and disconnect after the success callback.
+
+Example:
+
+```kotlin
+DHBleSdk.modifyDevicePwd("0000", object : CustomStatusCallback {
+    override fun onSuccess() {
+        //The password is now 0000. Continue local unbinding and disconnect.
+        DHBleSdk.disconnect()
+    }
+
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "Modify password failed: $errorCode")
+    }
+})
+```
 
 #### 3.2.2 Health Data Synchronization (Real-time Single Measurement and All-day Monitoring)
 

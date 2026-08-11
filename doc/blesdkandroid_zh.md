@@ -145,11 +145,11 @@ DHBleSdk.connectDeviceWithModel(bleDevice)
 
 // 3. 实现并回调蓝牙连接状态
 interface RingConnectBleCallback {
-  fun onRingConnecting()
-  fun onRingConnected()
-  fun onRingConnectFailed(reason: RingBleError = RingBleError.UNKNOWN)
+  fun onRingConnecting(device: BleDevice?)
+  fun onRingConnected(device: BleDevice?)
+  fun onRingConnectFailed(device: BleDevice?, reason: RingBleError = RingBleError.UNKNOWN)
 
-  fun onRingDidFunctionMenu(supportMenuBean:SupportMenuBean)
+  fun onRingDidFunctionMenu(device: BleDevice?, supportMenuBean: SupportMenuBean)
 }
 ```
 
@@ -159,7 +159,7 @@ interface RingConnectBleCallback {
 | :-------------------- | ---------------------------------------------------- |
 | onRingConnecting      | 连接中                                               |
 | onRingConnected       | connectDeviceWithModel后,连接成功会返回.             |
-| onRingConnectFailed   | 蓝牙断开会回调                                       |
+| onRingConnectFailed   | 连接失败或断开会回调；密码认证失败时 `reason` 为 `PASSWORD_AUTH_FAILED` |
 | onRingDidFunctionMenu | 成功获取设备配置表后会返回;业务操作应该在此之后操作. |
 
 >  [!TIP]
@@ -231,6 +231,7 @@ DeviceFuncV2Model类属性定义:
 | isSupportSensorRawSleep     | 是否支持睡眠实时数据       |
 | isSupportFallDetect         | 是否支持跌落提醒           |
 | isSupportRecording          | 是否支持录音功能           |
+| isSupportDevicePasswordAuth | 是否支持设备密码认证       |
 
 
 ### 3.2 设备功能操作
@@ -1316,6 +1317,80 @@ private val countReminderCallback by lazy {
 ```
 
 
+
+##### 3.2.1.26 设备密码认证
+
+> 设备是否支持密码认证通过功能配置表属性 `isSupportDevicePasswordAuth` 判断。
+>
+> 密码为4位数字。传入 `null` 或空字符串时按默认密码 `0000` 处理。
+>
+> 支持密码认证的设备，认证成功后才回调 `onRingDidFunctionMenu`；认证失败时SDK主动断开，并返回 `RingBleError.PASSWORD_AUTH_FAILED`。不支持的设备沿用原连接流程。
+
+```mermaid
+flowchart TD
+    A["是否支持密码认证"] -->|不支持| B["进入业务可用状态<br/>回调 onRingDidFunctionMenu"]
+    A -->|支持| C["使用预设密码自动认证"]
+    C -->|认证成功| B
+    C -->|认证失败：PASSWORD_AUTH_FAILED| D["主动断开<br/>onRingConnectFailed"]
+```
+
+###### 3.2.1.26.1 设置自动认证密码
+
+`fun prepareAutoPassword(password: String?)`
+
+> 设置SDK连接时自动认证使用的密码。可在SDK初始化后提前设置，但必须在连接设备前完成调用。
+
+输入参数说明:
+
+| 参数       | 类型     | 说明                                                  |
+| ---------- | -------- | ----------------------------------------------------- |
+| `password` | `String` | 4位数字密码；传入 `null` 或空字符串时按 `0000` 处理   |
+
+返回回调说明:
+
+| 回调方法                | 返回值                               | 说明                               |
+| ----------------------- | ------------------------------------ | ---------------------------------- |
+| `onRingDidFunctionMenu` | `SupportMenuBean`                    | 密码认证成功，设备进入业务可用状态 |
+| `onRingConnectFailed`   | `RingBleError.PASSWORD_AUTH_FAILED`  | 密码认证失败，SDK会主动断开设备    |
+
+调用示例:
+
+```kotlin
+DHBleSdk.setConnectBleCallback(this)
+DHBleSdk.prepareAutoPassword("1234")
+DHBleSdk.connectDeviceWithModel(bleDevice)
+
+override fun onRingDidFunctionMenu(device: BleDevice?, supportMenuBean: SupportMenuBean) {
+    Log.e("RWSDK", "Device ready")
+}
+
+override fun onRingConnectFailed(device: BleDevice?, reason: RingBleError) {
+    if (reason == RingBleError.PASSWORD_AUTH_FAILED) {
+        Log.e("RWSDK", "Device password authentication failed")
+    }
+}
+```
+
+###### 3.2.1.26.2 修改设备密码
+
+`fun modifyDevicePwd(password: String?, callback: CustomStatusCallback)`
+
+> 在设备已连接且密码认证成功后修改设备密码。正常解绑时，应先将设备密码修改为 `0000`，收到成功回调后再清除本地绑定并断开连接。
+
+调用示例:
+
+```kotlin
+DHBleSdk.modifyDevicePwd("0000", object : CustomStatusCallback {
+    override fun onSuccess() {
+        //密码已恢复为0000，可继续处理本地解绑并断开设备。
+        DHBleSdk.disconnect()
+    }
+
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "Modify password failed: $errorCode")
+    }
+})
+```
 
 #### 3.2.2 健康数据同步(实时单次与全天检测)
 
@@ -2453,6 +2528,9 @@ fun unregisterSleepRawDataCallback() {
    
 
 ## SDK修订记录
+
+**v2.0.0_20260807** (2026.08.07)
+- 添加设备密码认证功能
 
 **v2.0.0_20260724** (2026.07.24)
 - 添加计步明细间隔支持

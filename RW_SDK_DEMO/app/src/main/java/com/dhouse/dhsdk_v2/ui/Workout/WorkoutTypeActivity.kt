@@ -139,7 +139,10 @@ class WorkoutTypeActivity : AppCompatActivity() {
             insets
         }
 
-        title = "Work out type"
+        supportActionBar?.apply {
+            title = getString(R.string.demo_workout_type)
+            setDisplayHomeAsUpEnabled(true)
+        }
 
         EventBus.getDefault().register(this)
 
@@ -152,6 +155,11 @@ class WorkoutTypeActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
 
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        return true
     }
 
     override fun onDestroy() {

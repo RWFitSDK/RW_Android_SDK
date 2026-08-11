@@ -87,7 +87,7 @@ dependencies {
     //eventbus
     implementation 'org.greenrobot:eventbus:3.2.0'
     implementation 'com.github.getActivity:XXPermissions:13.2'
-    implementation files('libs/blesdk-rwfit-release_v2_260724.aar')
+    implementation files('libs/blesdk-rwfit-release_v2_260807.aar')
 
 
     implementation 'com.github.zzy0516alex:FileSelectorRelease:v6.1'

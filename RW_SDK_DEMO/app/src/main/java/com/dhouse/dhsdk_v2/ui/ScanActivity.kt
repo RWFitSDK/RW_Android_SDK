@@ -45,6 +45,10 @@ class ScanActivity : AppCompatActivity(), ScanDeviceCallback, View.OnClickListen
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
+        supportActionBar?.apply {
+            title = getString(R.string.demo_scan_devices)
+            setDisplayHomeAsUpEnabled(true)
+        }
         ScreenStatusReceive.registerScreenReceive(this)
 
         if (!BleHelper.isBleOpen(this)) {
@@ -76,7 +80,6 @@ class ScanActivity : AppCompatActivity(), ScanDeviceCallback, View.OnClickListen
 
         binding.refreshBtn.setOnClickListener(this)
         binding.stopBtn.setOnClickListener(this)
-        binding.backBtn.setOnClickListener(this)
         binding.connecting.setOnClickListener(this)
 
 
@@ -161,10 +164,12 @@ class ScanActivity : AppCompatActivity(), ScanDeviceCallback, View.OnClickListen
             R.id.stopBtn -> {
                 ScanBleService.getService().stopScan()
             }
-            R.id.backBtn -> {
-                closeScanPage()
-            }
         }
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        closeScanPage()
+        return true
     }
 
     private fun closeScanPage() {
@@ -199,9 +204,9 @@ class ScanActivity : AppCompatActivity(), ScanDeviceCallback, View.OnClickListen
         runOnUiThread {
             binding.connecting.visibility = View.INVISIBLE
             val message = if (reason == RingBleError.BLUETOOTH_GATT_CACHE_RESTRICTED) {
-                "蓝牙缓存异常，请关闭并重新打开手机蓝牙后重试"
+                getString(R.string.demo_ble_cache_error)
             } else {
-                "连接失败，请重试"
+                getString(R.string.demo_connection_failed)
             }
             Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }

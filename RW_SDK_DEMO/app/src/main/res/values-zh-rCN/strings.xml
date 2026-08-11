@@ -1,5 +1,15 @@
 <?xml version="1.0" ?>
 <resources>
+    <string name="share_logs">分享日志</string>
+    <string name="preparing_log_archive">正在打包日志…</string>
+    <string name="no_logs_to_share">暂无可分享的日志</string>
+    <string name="share_logs_failed">日志分享失败</string>
+    <string name="share_logs_chooser">选择日志接收应用</string>
+    <string name="menu_get_cmd">APP获取命令</string>
+    <string name="menu_set_cmd">APP设置命令</string>
+    <string name="menu_control_cmd">APP控制命令</string>
+    <string name="menu_sync_cmd">APP数据同步命令</string>
+    <string name="menu_broadcast_cmd">设备广播接收</string>
     <string-array name="jlrunning_string_array">
         <item>跑步</item>
         <item>跑步机</item>

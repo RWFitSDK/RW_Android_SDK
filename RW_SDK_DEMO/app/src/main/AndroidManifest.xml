@@ -30,6 +30,11 @@
         <activity
             android:name=".ui.Workout.WorkoutTypeActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.health.HealthDetailActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme.NoActionBar" />
 
         <meta-data
             android:name="ScopedStorage"
