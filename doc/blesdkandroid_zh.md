@@ -2434,7 +2434,7 @@ private val sportResult3Callback by lazy {
 >
 > PPG/ACC/PPG Red/IR原始数据不支持实时推送, 仅支持历史方式获取; 睡眠状态数据只使用实时推送, 不通过历史原始数据接口获取.
 >
-> 当前历史原始数据采样率最高可达100Hz, 最多支持约1分钟测试数据. 每个采样点不单独记录时间戳, 无法还原每个采样点的绝对时间.
+> 设备只保存最近一次约1分钟的PPG原始数据, 无论由定时监测还是手动测量触发, 下一次采集都可能覆盖尚未同步的数据. 每次采集完成后, 设备会通过 `SensorRawControlCallback.onResult(reason)` 通知停止; 收到通知后应及时调用 `ringGetHistorySensorRaw()` 同步并持久化数据.
 >
 > 配置表属性: `isSupportSensorRawPPG` (PPG), `isSupportSensorRawACC` (ACC), `isSupportSensorRawPPGRed` (PPG Red), `isSupportSensorRawIR` (IR), `isSupportSensorRawSleep` (睡眠实时数据).
 
