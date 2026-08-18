@@ -176,6 +176,8 @@ interface RingConnectBleCallback {
  DHBleSdk.disconnect()
 ```
 
+> 调用后请等待 `onRingConnectFailed` 回调完成，再发起重连或绑定其他设备，确保当前连接及相关资源已完成释放。
+
 ##### 3.1.5 本地绑定与自动重连,解绑
 
 > [!IMPORTANT]

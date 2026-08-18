@@ -193,6 +193,8 @@ interface RingConnectBleCallback {
  DHBleSdk.disconnect()
 ```
 
+> After calling this method, wait for `onRingConnectFailed` before reconnecting or binding another device, so the current connection and related resources can be fully released.
+
 ##### 3.1.5 Local binding and automatic reconnection, unbinding
 
 >  [!IMPORTANT]
