@@ -106,6 +106,13 @@
     <string name="demo_time_range_desc">Set switch and active time range</string>
     <string name="demo_bright_duration">Screen-on duration</string>
     <string name="demo_bright_duration_desc">Set 0–30 seconds</string>
+    <string name="demo_screen_control">Instant screen control</string>
+    <string name="demo_screen_control_desc">Turn the screen on or off, or read its current state</string>
+    <string name="demo_screen_on_now">Turn screen on now</string>
+    <string name="demo_screen_off_now">Turn screen off now</string>
+    <string name="demo_get_screen_status">Get current screen state</string>
+    <string name="demo_screen_is_on">Screen is on</string>
+    <string name="demo_screen_is_off">Screen is off</string>
     <string name="demo_raise_to_wake">Raise to wake</string>
     <string name="demo_video_control">Video control</string>
     <string name="demo_video_control_desc">Off, Video, Book or Music</string>

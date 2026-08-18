@@ -232,6 +232,7 @@ DeviceFuncV2Model类属性定义:
 | isSupportFallDetect         | 是否支持跌落提醒           |
 | isSupportRecording          | 是否支持录音功能           |
 | isSupportDevicePasswordAuth | 是否支持设备密码认证       |
+| isSupportScreenControl      | 是否支持即时屏幕亮灭控制   |
 
 
 ### 3.2 设备功能操作
@@ -1407,6 +1408,46 @@ DHBleSdk.modifyDevicePwd("0000", object : CustomStatusCallback {
 })
 ```
 
+##### 3.2.1.27 即时屏幕控制
+
+> 功能配置表属性：`isSupportScreenControl`。仅支持该能力的设备可使用。
+
+方法说明：
+
+`fun setScreenOn(isOn: Boolean)`
+
+参数说明：
+
+| 参数 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| isOn | Boolean | `true`：亮屏；`false`：息屏 |
+
+回调说明：
+
+- 设置结果通过 `ScreenStatusCallback` 的 `onSuccess/onFail` 返回。
+
+调用示例：
+
+```kotlin
+// 设置屏幕状态
+val setScreenCallback = object : ScreenStatusCallback {
+  override fun onResult(data: Boolean?) {
+  }
+
+  override fun onSuccess() {
+    Log.e("RWSDK", "screen control success")
+    DHBleSdk.dispose(this)
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "screen control failed: $errorCode")
+    DHBleSdk.dispose(this)
+  }
+}
+DHBleSdk.subscribeData(setScreenCallback)
+DHBleSdk.setScreenOn(true)
+```
+
 #### 3.2.2 健康数据同步(实时单次与全天检测)
 
 > 健康数据检测有两种方式: 实时单次检测与全天检测。健康数据包括心率,血氧,压力,HRV,睡眠等, **睡眠无实时检测**。 
@@ -2009,6 +2050,78 @@ DHBleSdk.syncHealthDataByType(Constants.RingHealthType.TODAY_STEP, this)
 >
 > OTA升级文件必须由设备厂家提供. 升级前先通过 [3.2.1.3 获取设备信息](#3213-获取设备信息) 读取 `FirmVersionBean.deviceClazz`, 并与升级文件适用的设备型号进行对比. 只有两个型号完全一致时才能升级; 型号不一致时禁止升级, 防止设备因错误固件变砖.
 
+##### 3.2.3.1 获取可用固件
+
+可通过以下接口查询指定设备型号的可用固件列表：
+
+```http
+GET https://ruiwo168.com/api/device/getOtaListByModel?model=<deviceClazz>
+```
+
+查询参数 `model` 对应 `getFirmwareVersionJL()` 返回的 `FirmVersionBean.deviceClazz`。请求接口前应先读取设备固件信息，并使用设备实际返回的 `deviceClazz` 作为 `model`。
+
+```kotlin
+val firmwareCallback = object : FirmwareCallback {
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    DHBleSdk.dispose(this)
+    Log.e("OTA", "firmware info get failed, errorCode=$errorCode")
+  }
+
+  override fun onResult(data: FirmVersionBean?) {
+    DHBleSdk.dispose(this)
+
+    val deviceClazz = data?.deviceClazz.orEmpty()
+    val deviceNo = data?.deviceNo.orEmpty()
+    if (deviceClazz.isBlank()) {
+      Log.e("OTA", "deviceClazz is empty")
+      return
+    }
+
+    // 在后台线程使用项目现有的网络组件请求该地址。
+    val url = "https://ruiwo168.com/api/device/getOtaListByModel?model=$deviceClazz"
+    Log.d("OTA", "query firmware: $url, currentVersion=$deviceNo")
+  }
+}
+
+DHBleSdk.subscribeData(firmwareCallback)
+DHBleSdk.getFirmwareVersionJL()
+```
+
+接口返回示例：
+
+```json
+{
+  "code": 0,
+  "msg": "操作成功",
+  "data": [
+    {
+      "deviceModel": "DEVICE_MODEL",
+      "toVersion": "X.Y.Z",
+      "size": 123456,
+      "downloadUrl": "https://example.com/path/firmware.bin"
+    }
+  ]
+}
+```
+
+OTA流程只需关注 `data` 中的以下字段，其他字段可以忽略：
+
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| deviceModel | String | 固件适用的设备型号，应与 `FirmVersionBean.deviceClazz` 完全一致 |
+| toVersion | String | `downloadUrl` 指向的固件版本号，正常发布环境用于判断是否有更高版本可升级 |
+| size | Int | 固件文件大小，单位为字节（Byte） |
+| downloadUrl | String | 固件文件下载地址 |
+
+正式发布时，APP应按 `X.Y.Z` 各段数值比较当前版本 `deviceNo` 与目标版本 `toVersion`，通常只提示升级到更高版本，不能直接按字符串比较。测试时可在确认固件有效后进行同版本升级或降级测试。
+
+下载及升级前均须确认 `deviceModel` 与设备的 `deviceClazz` 完全一致。固件下载到本地后，将文件路径传给 `ringOtaWithFileData()`；如使用自有服务器，请自行维护设备型号、版本号与固件包的对应关系。
+
+##### 3.2.3.2 执行OTA升级
+
 升级前校验:
 
 | 校验内容 | 数据来源 | 要求 |
@@ -2543,6 +2656,11 @@ fun unregisterSleepRawDataCallback() {
    
 
 ## SDK修订记录
+
+**v2.0.0_20260817** (2026.08.17)
+- 添加即时屏幕控制功能(3.2.1.27)
+- 修复设备无闹钟时，获取闹钟未通过 `onResult` 返回空列表的问题
+- 补充获取可用固件接口及OTA设备型号、版本校验说明(3.2.3.1)
 
 **v2.0.0_20260807** (2026.08.07)
 - 添加设备密码认证功能

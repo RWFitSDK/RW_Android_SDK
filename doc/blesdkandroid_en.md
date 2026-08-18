@@ -45,6 +45,12 @@ implementation files('libs/blesdk_rwfit_release_260130.aar')
 
 ## SDK Revision History
 
+**V2.0.0_20260817** (2026.08.17)
+
+- Added instant screen control (3.2.1.27).
+- Fixed alarm retrieval so that `onResult` returns an empty list when the device has no alarms.
+- Added the available-firmware endpoint and OTA device-model/version validation guidance (3.2.3.1).
+
 **V2.0.0_20260724** (2026.07.24)
 
 - Added support for step-detail intervals.
@@ -243,6 +249,7 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportFallDetect         | Does it support fall detection alert?                        |
 | isSupportRecording          | Does it support recording function?                          |
 | isSupportDevicePasswordAuth | Does it support device password authentication?              |
+| isSupportScreenControl      | Does it support instant screen on/off control?                |
 
 
 ### 3.2 Device function operation
@@ -1388,6 +1395,46 @@ DHBleSdk.modifyDevicePwd("0000", object : CustomStatusCallback {
 })
 ```
 
+##### 3.2.1.27 Instant Screen Control
+
+> Configuration-table property: `isSupportScreenControl`. Use this feature only when the device reports support.
+
+Methods:
+
+`fun setScreenOn(isOn: Boolean)`
+
+Parameter:
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| isOn | Boolean | `true`: turn the screen on; `false`: turn the screen off |
+
+Callbacks:
+
+- Setting results are returned through `ScreenStatusCallback.onSuccess/onFail`.
+
+Example:
+
+```kotlin
+// Set the current screen state.
+val setScreenCallback = object : ScreenStatusCallback {
+  override fun onResult(data: Boolean?) {
+  }
+
+  override fun onSuccess() {
+    Log.e("RWSDK", "screen control success")
+    DHBleSdk.dispose(this)
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "screen control failed: $errorCode")
+    DHBleSdk.dispose(this)
+  }
+}
+DHBleSdk.subscribeData(setScreenCallback)
+DHBleSdk.setScreenOn(true)
+```
+
 #### 3.2.2 Health Data Synchronization (Real-time Single Measurement and All-day Monitoring)
 
 > There are two ways to detect health data: real-time single measurement and all-day monitoring. Health data includes heart rate, blood oxygen, stress, HRV, sleep, etc. **Sleep data does not have real-time measurement.**
@@ -1980,6 +2027,78 @@ Callback: `onSyncMuslimCount(List<MuslimCountSyncBean> data)`
 > [!CAUTION]
 >
 > The OTA firmware file must be provided by the device manufacturer. Before upgrading, follow [3.2.1.3 Get Device Information](#3213-get-device-information) to read `FirmVersionBean.deviceClazz` and compare it with the device model supported by the firmware file. Upgrade only when the two models match exactly. Do not upgrade when they do not match, as using firmware for another model may make the device unusable.
+
+##### 3.2.3.1 Get Available Firmware
+
+Use the following endpoint to query the available firmware list for a device model:
+
+```http
+GET https://ruiwo168.com/api/device/getOtaListByModel?model=<deviceClazz>
+```
+
+The `model` query parameter corresponds to `FirmVersionBean.deviceClazz` returned by `getFirmwareVersionJL()`. Read the device firmware information first and use the actual `deviceClazz` reported by the device.
+
+```kotlin
+val firmwareCallback = object : FirmwareCallback {
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    DHBleSdk.dispose(this)
+    Log.e("OTA", "firmware info get failed, errorCode=$errorCode")
+  }
+
+  override fun onResult(data: FirmVersionBean?) {
+    DHBleSdk.dispose(this)
+
+    val deviceClazz = data?.deviceClazz.orEmpty()
+    val deviceNo = data?.deviceNo.orEmpty()
+    if (deviceClazz.isBlank()) {
+      Log.e("OTA", "deviceClazz is empty")
+      return
+    }
+
+    // Use the app's existing networking component to request this URL on a background thread.
+    val url = "https://ruiwo168.com/api/device/getOtaListByModel?model=$deviceClazz"
+    Log.d("OTA", "query firmware: $url, currentVersion=$deviceNo")
+  }
+}
+
+DHBleSdk.subscribeData(firmwareCallback)
+DHBleSdk.getFirmwareVersionJL()
+```
+
+Example response:
+
+```json
+{
+  "code": 0,
+  "msg": "操作成功",
+  "data": [
+    {
+      "deviceModel": "DEVICE_MODEL",
+      "toVersion": "X.Y.Z",
+      "size": 123456,
+      "downloadUrl": "https://example.com/path/firmware.bin"
+    }
+  ]
+}
+```
+
+Only the following fields in `data` are required for the OTA flow. Other fields may be ignored:
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| deviceModel | String | Target device model; it must exactly match `FirmVersionBean.deviceClazz` |
+| toVersion | String | Firmware version represented by `downloadUrl`; used to determine whether a newer release is available |
+| size | Int | Firmware file size in bytes |
+| downloadUrl | String | Firmware download URL |
+
+For production releases, compare the current `deviceNo` with the target `toVersion` numerically by each `X.Y.Z` segment and normally prompt only for a newer version. Do not compare versions as plain strings. For testing, the same version or a downgrade may be installed after confirming that the firmware is valid.
+
+Before downloading and again before upgrading, verify that `deviceModel` exactly matches the device's `deviceClazz`. After downloading the firmware to local storage, pass its file path to `ringOtaWithFileData()`. When hosting firmware on your own server, maintain the mapping between device models, version numbers, and firmware files.
+
+##### 3.2.3.2 Perform OTA Upgrade
 
 Pre-upgrade validation:
 

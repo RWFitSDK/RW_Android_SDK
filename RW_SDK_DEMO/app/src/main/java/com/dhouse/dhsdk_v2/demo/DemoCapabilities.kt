@@ -21,6 +21,7 @@ fun buildDeviceSettings(context: Context, menu: SupportMenuBean?): List<DemoSett
     add(menu.isAlarm, "alarm", R.string.demo_alarm, R.string.demo_alarm_desc)
     add(menu.isBrightScreenSleepTime, "screen_sleep", R.string.demo_screen_sleep, R.string.demo_time_range_desc)
     add(menu.isBrightScreenTime, "bright_duration", R.string.demo_bright_duration, R.string.demo_bright_duration_desc)
+    add(menu.isSupportScreenControl, "screen_control", R.string.demo_screen_control, R.string.demo_screen_control_desc)
     add(menu.isRaiseBrightScreen, "raise_to_wake", R.string.demo_raise_to_wake, R.string.demo_time_range_desc)
     add(menu.isVideoHid, "video", R.string.demo_video_control, R.string.demo_video_control_desc)
     add(menu.isLEDLight, "led", R.string.demo_led_brightness, R.string.demo_led_brightness_desc)

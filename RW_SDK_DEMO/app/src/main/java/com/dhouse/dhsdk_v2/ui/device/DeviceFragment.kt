@@ -3,6 +3,7 @@ package com.dhouse.dhsdk_v2.ui.device
 import android.content.Intent
 import android.app.TimePickerDialog
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -159,6 +160,7 @@ class DeviceFragment : Fragment() {
                 DHBleSdk.subscribeData(callback)
                 DHBleSdk.setBrightScreenTimeJL(BrightScreenTimeBean().apply { timeSecond = seconds })
             }
+            "screen_control" -> showScreenControlActions(item.id)
             "raise_to_wake" -> editTimeRange(getString(R.string.demo_raise_to_wake), 8, 0, 20, 0) { enabled, sh, sm, eh, em ->
                 val callback = object : BrightCallback {
                     override fun onResult(data: BrightScreenBean?) = Unit
@@ -300,6 +302,65 @@ class DeviceFragment : Fragment() {
                 }
             }
         }
+    }
+
+    private fun showScreenControlActions(settingId: String) {
+        choose(
+            getString(R.string.demo_screen_control),
+            arrayOf(
+                getString(R.string.demo_screen_on_now),
+                getString(R.string.demo_screen_off_now),
+                getString(R.string.demo_get_screen_status)
+            )
+        ) { action ->
+            when (action) {
+                0 -> setScreenOn(true, settingId)
+                1 -> setScreenOn(false, settingId)
+                2 -> getScreenStatus(settingId)
+            }
+        }
+    }
+
+    private fun setScreenOn(isOn: Boolean, settingId: String) {
+        val callback = object : ScreenStatusCallback {
+            override fun onResult(data: Boolean?) = Unit
+
+            override fun onSuccess() {
+                DHBleSdk.dispose(this)
+                if (!isAdded) return
+                val value = getString(if (isOn) R.string.demo_screen_is_on else R.string.demo_screen_is_off)
+                updateSettingValue(settingId, value)
+                toast(getString(R.string.demo_setting_success))
+            }
+
+            override fun onFail(errorCode: Int) {
+                DHBleSdk.dispose(this)
+                if (isAdded) toast(getString(R.string.demo_setting_failed, errorCode))
+            }
+        }
+        DHBleSdk.subscribeData(callback)
+        DHBleSdk.setScreenOn(isOn)
+    }
+
+    private fun getScreenStatus(settingId: String) {
+        val callback = object : ScreenStatusCallback {
+            override fun onResult(data: Boolean?) {
+                DHBleSdk.dispose(this)
+                if (!isAdded) return
+                val value = getString(if (data == true) R.string.demo_screen_is_on else R.string.demo_screen_is_off)
+                updateSettingValue(settingId, value)
+                toast(value)
+            }
+
+            override fun onSuccess() = Unit
+
+            override fun onFail(errorCode: Int) {
+                DHBleSdk.dispose(this)
+                if (isAdded) toast(getString(R.string.demo_setting_failed, errorCode))
+            }
+        }
+        DHBleSdk.subscribeData(callback)
+        DHBleSdk.getScreenOn()
     }
 
     private fun showSensorRawPpgActions() {
@@ -445,6 +506,10 @@ class DeviceFragment : Fragment() {
     private fun getAllAlarms() {
         val callback = object : AlarmCallback {
             override fun onResult(data: List<AlarmRemainderBean?>?) {
+                Log.e(
+                    "RWSDK",
+                    "AlarmCallback.onResult BLE_KEY_ALARM read response: dataNull=${data == null}, size=${data?.size ?: 0}, empty=${data.isNullOrEmpty()}, data=$data"
+                )
                 DHBleSdk.dispose(this)
                 if (!isAdded) return
                 val alarms = data.orEmpty().filterNotNull()
@@ -463,9 +528,16 @@ class DeviceFragment : Fragment() {
                     .show()
             }
 
-            override fun onSuccess() = Unit
-            override fun onFail(errorCode: Int) = settingFail(this, errorCode)
+            override fun onSuccess() {
+                Log.e("RWSDK", "AlarmCallback.onSuccess BLE_KEY_ALARM read ACK received; waiting for onResult data response")
+            }
+
+            override fun onFail(errorCode: Int) {
+                Log.e("RWSDK", "AlarmCallback.onFail BLE_KEY_ALARM read failed: errorCode=$errorCode")
+                settingFail(this, errorCode)
+            }
         }
+        Log.e("RWSDK", "BLE_KEY_ALARM read request: subscribe AlarmCallback and call getAlarmRemindJL()")
         DHBleSdk.subscribeData(callback)
         DHBleSdk.getAlarmRemindJL()
     }
