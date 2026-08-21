@@ -45,6 +45,11 @@ implementation files('libs/blesdk_rwfit_release_260130.aar')
 
 ## SDK Revision History
 
+**V2.0.0_20260820** (2026.08.20)
+
+- Added the `setDeviceTime` custom device-time API for debugging and testing.
+- Added authorized password reset support (3.2.1.26.3).
+
 **V2.0.0_20260817** (2026.08.17)
 
 - Added instant screen control (3.2.1.27).
@@ -78,7 +83,7 @@ DHBleSdk.initSDK(this)
 
 >  [!CAUTION]
 >
-> Bluetooth log files will be saved by default in the `Data/appid/logger/devices/` folder. This can be disabled using `XLogUtils.setLogEnable(false)`.
+> The SDK outputs and saves Bluetooth logs by default. Log files are stored in the app's internal `files/logger/devices/` directory. Call `DHBleSdk.setLogEnable(false)` to disable both log output and local file writing.
 
 
 
@@ -104,6 +109,9 @@ If the AAR is repackaged in a way that discards its consumer rules, add the foll
 -keep class com.example.blesdk.blering.BaseAnswerCallback { *; }
 -keep class com.example.blesdk.blering.RingConnectBleCallback { *; }
 -keep class com.example.blesdk.blering.RingBleError { *; }
+-keep class com.example.blesdk.blering.OnDevicePushListener { *; }
+-keep class com.example.blesdk.blering.PushData { *; }
+-keep class com.example.blesdk.blering.DevicePushType { *; }
 
 -keep class com.example.blesdk.utils.** { *; }
 ```
@@ -1395,6 +1403,26 @@ DHBleSdk.modifyDevicePwd("0000", object : CustomStatusCallback {
         Log.e("RWSDK", "Modify password failed: $errorCode")
     }
 })
+```
+
+###### 3.2.1.26.3 Prepare an Authorized Password Reset
+
+`fun preparePasswordReset(targetPassword: String?)`
+
+> If the original device password is unavailable, the app may call this method after confirming that the user is authorized to reset the device. It sets a new target password for the next connection so that a password-protected device does not become permanently unusable. The app decides how reset authorization is verified; scanning a QR code on the package is only one possible method.
+
+Parameter:
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| `targetPassword` | `String` | New four-digit password; `null` or an empty string is treated as `0000` |
+
+Example:
+
+```kotlin
+// Call after the app confirms that the user is authorized to reset the device.
+DHBleSdk.preparePasswordReset("5678")
+DHBleSdk.connectDeviceWithModel(bleDevice)
 ```
 
 ##### 3.2.1.27 Instant Screen Control

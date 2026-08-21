@@ -63,7 +63,7 @@ DHBleSdk.initSDK(this)
 
 > [!CAUTION]
 >
-> 会默认保存蓝牙部分日志文件, 保存在 `Data/appid(com.xxx.xxx)/logger/devices/`文件夹下.  可`XLogUtils.setLogEnable(false)`关闭.
+> SDK默认输出并保存蓝牙日志，日志文件位于应用内部的 `files/logger/devices/` 目录。可通过 `DHBleSdk.setLogEnable(false)` 同时关闭日志输出和本地文件写入。
 
 
 
@@ -89,6 +89,9 @@ Release AAR 已对 SDK 内部实现进行混淆，并已内置用于保留公开
 -keep class com.example.blesdk.blering.BaseAnswerCallback { *; }
 -keep class com.example.blesdk.blering.RingConnectBleCallback { *; }
 -keep class com.example.blesdk.blering.RingBleError { *; }
+-keep class com.example.blesdk.blering.OnDevicePushListener { *; }
+-keep class com.example.blesdk.blering.PushData { *; }
+-keep class com.example.blesdk.blering.DevicePushType { *; }
 
 -keep class com.example.blesdk.utils.** { *; }
 ```
@@ -1410,6 +1413,26 @@ DHBleSdk.modifyDevicePwd("0000", object : CustomStatusCallback {
 })
 ```
 
+###### 3.2.1.26.3 准备授权密码重置
+
+`fun preparePasswordReset(targetPassword: String?)`
+
+> 当无法获得设备原密码时，业务端可在确认用户具备设备重置权限后调用本方法，为下一次连接设置新的目标密码，避免已设置密码的设备无法继续使用。重置权限的确认方式由业务端决定，扫描包装盒二维码只是其中一种方式。
+
+参数说明:
+
+| 参数 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| `targetPassword` | `String` | 重置后的4位数字密码；传入 `null` 或空字符串时按 `0000` 处理 |
+
+调用示例:
+
+```kotlin
+// 业务端确认用户具备重置权限后调用。
+DHBleSdk.preparePasswordReset("5678")
+DHBleSdk.connectDeviceWithModel(bleDevice)
+```
+
 ##### 3.2.1.27 即时屏幕控制
 
 > 功能配置表属性：`isSupportScreenControl`。仅支持该能力的设备可使用。
@@ -2658,6 +2681,10 @@ fun unregisterSleepRawDataCallback() {
    
 
 ## SDK修订记录
+
+**v2.0.0_20260820** (2026.08.20)
+- 添加调试、测试用自定义设备时间设置接口 `setDeviceTime`
+- 添加授权密码重置功能(3.2.1.26.3)
 
 **v2.0.0_20260817** (2026.08.17)
 - 添加即时屏幕控制功能(3.2.1.27)
