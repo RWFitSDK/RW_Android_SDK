@@ -392,14 +392,14 @@ class DeviceFragment : Fragment() {
 
     private fun getSensorRawPpgHistory() {
         if (sensorHistoryCallback != null) return
-        var records: List<SensorHistoryRawBean> = emptyList()
         val callback = object : SensorHistoryRawCallback {
             override fun onResult(data: List<SensorHistoryRawBean>?) {
-                records = data.orEmpty()
+                // 历史数据在设备返回结束包后一次性通过 onResult 返回，收到即表示读取完成。
+                finishSensorHistory(this, data.orEmpty())
             }
 
             override fun onSuccess() {
-                finishSensorHistory(this, records)
+                // 当前历史读取流程以 onResult 作为完成回调；保留空实现兼容接口定义。
             }
 
             override fun onFail(errorCode: Int) {
