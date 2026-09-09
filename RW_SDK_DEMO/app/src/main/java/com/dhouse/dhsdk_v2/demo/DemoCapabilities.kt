@@ -25,6 +25,7 @@ fun buildDeviceSettings(context: Context, menu: SupportMenuBean?): List<DemoSett
     add(menu.isRaiseBrightScreen, "raise_to_wake", R.string.demo_raise_to_wake, R.string.demo_time_range_desc)
     add(menu.isVideoHid, "video", R.string.demo_video_control, R.string.demo_video_control_desc)
     add(menu.isLEDLight, "led", R.string.demo_led_brightness, R.string.demo_led_brightness_desc)
+    add(menu.isLEDLight, "time_format", R.string.demo_time_format, R.string.demo_time_format_desc)
     add(menu.isWearDir, "wear", R.string.demo_wear_position, R.string.demo_wear_position_desc)
     add(menu.isFindDevice, "find", R.string.demo_find_device, R.string.demo_find_device_desc, R.string.demo_execute_now)
     add(menu.isTakePhoto, "take_photo", R.string.demo_camera_control, R.string.demo_camera_control_desc)

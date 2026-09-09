@@ -8,7 +8,7 @@
 
 #### 1.1 适用平台与语言
 
-- Android8.0及以上, 语言Kotlin.
+- Android 7.0及以上（API 24及以上）, 语言Kotlin.
 
 #### 1.2 相关术语
 
@@ -238,6 +238,7 @@ DeviceFuncV2Model类属性定义:
 | isSupportRecording          | 是否支持录音功能           |
 | isSupportDevicePasswordAuth | 是否支持设备密码认证       |
 | isSupportScreenControl      | 是否支持即时屏幕亮灭控制   |
+| isSupportUnitSetting        | 是否支持公制/英制单位设置  |
 
 
 ### 3.2 设备功能操作
@@ -361,6 +362,7 @@ DHBleSdk.getFirmwareVersionJL()
 | PowerBean属性 | 类型 | 说明                |
 | ------------- | ---- | ------------------- |
 | power         | int  | 剩余电量, 范围0-100 |
+| powerStatus   | int  | 充电状态：`0`未在充电，`1`正在充电；需设备固件支持，旧固件未返回时为默认值`0` |
 
 调用示例:
 
@@ -381,6 +383,32 @@ DHBleSdk.subscribeData(object : PowerCallback {
 })
 
 DHBleSdk.getPowerJL()
+```
+
+###### 3.2.1.4.1 实时电量监听
+
+支持实时电量推送的设备，会在开始充电或停止充电时主动推送当前电量和充电状态。该能力需设备固件支持，并非固定周期持续上报；如需主动获取当前电量，请调用 `getPowerJL()`。
+
+通过 `OnDevicePushListener` 监听实时电量：
+
+```kotlin
+val powerPushListener = object : OnDevicePushListener {
+  override fun onPush(data: PushData) {
+    if (data.type != DevicePushType.POWER) return
+
+    val powerBean = data.value as? PowerBean ?: return
+    Log.e(
+      "RWSDK",
+      "realtime power=${powerBean.power}, charging=${powerBean.powerStatus}"
+    )
+  }
+}
+
+// 开始监听
+DHBleSdk.addOnDevicePushListener(powerPushListener)
+
+// 不再使用时移除，须传入添加时的同一实例
+DHBleSdk.removeOnDevicePushListener(powerPushListener)
 ```
 
 
@@ -1471,6 +1499,73 @@ val setScreenCallback = object : ScreenStatusCallback {
 }
 DHBleSdk.subscribeData(setScreenCallback)
 DHBleSdk.setScreenOn(true)
+```
+
+##### 3.2.1.28 公制/英制单位设置与获取
+
+> 功能配置表属性：`isSupportUnitSetting`。仅支持该能力的设备可使用。
+>
+> 订阅 `UnitSettingCallback` 获取操作结果。
+
+方法说明：
+
+`fun setMeasureUnit(type: Int)`
+
+`fun getMeasureUnit()`
+
+参数说明：
+
+| 参数 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| type | Int | `0`：公制；`1`：英制 |
+
+回调说明：
+
+- 设置成功通过 `onSuccess()` 返回，设置失败通过 `onFail(errorCode)` 返回。
+- 查询结果通过 `onResult(data)` 返回，`data` 的值为当前单位类型。
+
+设置示例：
+
+```kotlin
+val unitSettingCallback = object : UnitSettingCallback {
+  override fun onResult(data: Int?) {
+  }
+
+  override fun onSuccess() {
+    Log.e("RWSDK", "measure unit set success")
+    DHBleSdk.dispose(this)
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "measure unit set failed: $errorCode")
+    DHBleSdk.dispose(this)
+  }
+}
+
+DHBleSdk.subscribeData(unitSettingCallback)
+DHBleSdk.setMeasureUnit(0)
+```
+
+获取示例：
+
+```kotlin
+val unitSettingCallback = object : UnitSettingCallback {
+  override fun onResult(data: Int?) {
+    Log.e("RWSDK", "measure unit=$data")
+    DHBleSdk.dispose(this)
+  }
+
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "measure unit get failed: $errorCode")
+    DHBleSdk.dispose(this)
+  }
+}
+
+DHBleSdk.subscribeData(unitSettingCallback)
+DHBleSdk.getMeasureUnit()
 ```
 
 #### 3.2.2 健康数据同步(实时单次与全天检测)
@@ -2681,6 +2776,11 @@ fun unregisterSleepRawDataCallback() {
    
 
 ## SDK修订记录
+
+**v2.0.0_20260909** (2026.09.09)
+- 添加公制/英制单位设置与获取接口(3.2.1.28)
+- 电量数据新增充电状态及实时电量监听(3.2.1.4)
+- Android最低支持版本调整为Android 7.0（API 24）
 
 **v2.0.0_20260820** (2026.08.20)
 - 添加调试、测试用自定义设备时间设置接口 `setDeviceTime`

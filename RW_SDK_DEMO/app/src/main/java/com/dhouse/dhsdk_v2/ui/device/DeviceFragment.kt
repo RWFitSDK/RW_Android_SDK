@@ -214,6 +214,16 @@ class DeviceFragment : Fragment() {
                     lcdLevel = index.coerceAtLeast(1)
                 })
             }
+            "time_format" -> {
+                val labels = arrayOf(getString(R.string.demo_24_hour_format), getString(R.string.demo_12_hour_format))
+                choose(getString(R.string.demo_time_format), labels) { index ->
+                    val callback = object : CustomStatusCallback {
+                        override fun onSuccess() = settingSuccess(this, item.id, labels[index])
+                        override fun onFail(errorCode: Int) = settingFail(this, errorCode)
+                    }
+                    DHBleSdk.ringSetTimeformat(index, callback)
+                }
+            }
             "wear" -> choose(getString(R.string.demo_wear_position), arrayOf(getString(R.string.demo_left_hand), getString(R.string.demo_right_hand))) { index ->
                 val callback = object : WearHandCallback {
                     override fun onResult(data: FactoryInBean?) = Unit
@@ -386,8 +396,8 @@ class DeviceFragment : Fragment() {
         if (action == SENSOR_RAW_STOP) {
             updateSettingValue("sensor_raw_ppg", getString(R.string.demo_sensor_stopping))
         }
-        // PPG 固定使用 sensorType=2，与微信小程序 Demo 保持一致。
-        DHBleSdk.ringControlSensorRaw(action, SENSOR_TYPE_PPG)
+        // 同时采集PPG绿光与ACC，sensorType按位组合：ACC(1) | PPG绿光(2) = 3。
+        DHBleSdk.ringControlSensorRaw(action, SENSOR_TYPE_PPG_ACC)
     }
 
     private fun getSensorRawPpgHistory() {
@@ -425,21 +435,30 @@ class DeviceFragment : Fragment() {
         sensorHistoryLoadingDialog = null
         if (!isAdded || records == null) return
 
-        val ppgRecords = records.filter { it.type == SENSOR_HISTORY_TYPE_PPG }
-        val sampleCount = ppgRecords.sumOf { it.ppgDataList?.size ?: 0 }
+        val sampleCount = records.sumOf(::sensorHistorySampleCount)
         updateSettingValue(
             "sensor_raw_ppg",
-            getString(R.string.demo_ppg_history_summary, ppgRecords.size, sampleCount)
+            getString(R.string.demo_ppg_history_summary, records.size, sampleCount)
         )
+        if (records.isEmpty()) {
+            showPpgHistoryResult(getString(R.string.demo_ppg_history_empty))
+            return
+        }
+        showPpgHistoryResult(getString(R.string.demo_ppg_history_result, records.size, sampleCount))
+    }
+
+    private fun sensorHistorySampleCount(record: SensorHistoryRawBean): Int = when (record.type) {
+        1 -> record.ppgDataList?.size ?: 0
+        2 -> record.accDataList?.size ?: 0
+        3 -> record.ppgRedDataList?.size ?: 0
+        4 -> record.irDataList?.size ?: 0
+        else -> 0
+    }
+
+    private fun showPpgHistoryResult(message: String) {
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.demo_ppg_history)
-            .setMessage(
-                if (ppgRecords.isEmpty()) {
-                    getString(R.string.demo_ppg_history_empty)
-                } else {
-                    getString(R.string.demo_ppg_history_result, ppgRecords.size, sampleCount)
-                }
-            )
+            .setMessage(message)
             .setPositiveButton(R.string.demo_confirm, null)
             .show()
     }
@@ -835,7 +854,6 @@ class DeviceFragment : Fragment() {
     companion object {
         private const val SENSOR_RAW_START = 1
         private const val SENSOR_RAW_STOP = 2
-        private const val SENSOR_TYPE_PPG = 2
-        private const val SENSOR_HISTORY_TYPE_PPG = 1
+        private const val SENSOR_TYPE_PPG_ACC = 3
     }
 }

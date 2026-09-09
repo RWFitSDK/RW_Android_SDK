@@ -118,6 +118,10 @@
     <string name="demo_video_control_desc">Off, Video, Book or Music</string>
     <string name="demo_led_brightness">LED brightness</string>
     <string name="demo_led_brightness_desc">Set LED switch and brightness</string>
+    <string name="demo_time_format">12/24-hour format</string>
+    <string name="demo_time_format_desc">Set the device time display format</string>
+    <string name="demo_24_hour_format">24-hour</string>
+    <string name="demo_12_hour_format">12-hour</string>
     <string name="demo_wear_position">Wear position</string>
     <string name="demo_wear_position_desc">Select left or right hand</string>
     <string name="demo_find_device">Find device</string>

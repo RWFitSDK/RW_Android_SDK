@@ -8,7 +8,7 @@ This document is only applicable to RW's Bluetooth devices.
 
 #### 1.1 Applicable platforms and languages
 
-- Android 8.0 and above, language Kotlin.
+- Android 7.0 and above (API 24 and above), language Kotlin.
 
 #### 1.2 Related terms
 
@@ -44,6 +44,12 @@ implementation files('libs/blesdk_rwfit_release_260130.aar')
 
 
 ## SDK Revision History
+
+**V2.0.0_20260909** (2026.09.09)
+
+- Added metric/imperial unit settings and retrieval (3.2.1.28).
+- Added charging status and real-time battery monitoring (3.2.1.4).
+- Lowered the minimum supported Android version to Android 7.0 (API 24).
 
 **V2.0.0_20260820** (2026.08.20)
 
@@ -260,6 +266,7 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportRecording          | Does it support recording function?                          |
 | isSupportDevicePasswordAuth | Does it support device password authentication?              |
 | isSupportScreenControl      | Does it support instant screen on/off control?                |
+| isSupportUnitSetting        | Does it support metric/imperial unit settings?                |
 
 
 ### 3.2 Device function operation
@@ -379,6 +386,7 @@ Return Value:
 | PowerBean property | Type | Description                    |
 | ------------------ | ---- | ------------------------------ |
 | power              | int  | Remaining battery level, 0-100 |
+| powerStatus        | int  | Charging status: `0` not charging, `1` charging; requires device firmware support. Defaults to `0` when not returned by older firmware. |
 
 Example of usage:
 
@@ -399,6 +407,32 @@ DHBleSdk.subscribeData(object : PowerCallback {
 })
 
 DHBleSdk.getPowerJL()
+```
+
+###### 3.2.1.4.1 Real-time Battery Monitoring
+
+Supported devices actively push the current battery level and charging status when charging starts or stops. This capability requires device firmware support and is not a periodic update. Call `getPowerJL()` when the app needs to actively query the current battery level.
+
+Listen for real-time battery updates through `OnDevicePushListener`:
+
+```kotlin
+val powerPushListener = object : OnDevicePushListener {
+  override fun onPush(data: PushData) {
+    if (data.type != DevicePushType.POWER) return
+
+    val powerBean = data.value as? PowerBean ?: return
+    Log.e(
+      "RWSDK",
+      "realtime power=${powerBean.power}, charging=${powerBean.powerStatus}"
+    )
+  }
+}
+
+// Start listening.
+DHBleSdk.addOnDevicePushListener(powerPushListener)
+
+// Remove the same listener instance when it is no longer needed.
+DHBleSdk.removeOnDevicePushListener(powerPushListener)
 ```
 
 ##### 3.2.1.5 Getting and Setting Video Control Switch
@@ -1463,6 +1497,73 @@ val setScreenCallback = object : ScreenStatusCallback {
 }
 DHBleSdk.subscribeData(setScreenCallback)
 DHBleSdk.setScreenOn(true)
+```
+
+##### 3.2.1.28 Metric/Imperial Unit Settings and Retrieval
+
+> Configuration-table property: `isSupportUnitSetting`. Use this feature only when the device reports support.
+>
+> Subscribe to `UnitSettingCallback` to receive operation results.
+
+Methods:
+
+`fun setMeasureUnit(type: Int)`
+
+`fun getMeasureUnit()`
+
+Parameter:
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| type | Int | `0`: metric; `1`: imperial |
+
+Callbacks:
+
+- A successful setting operation is returned through `onSuccess()`, and a failure through `onFail(errorCode)`.
+- The current unit is returned through `onResult(data)` when querying.
+
+Setting example:
+
+```kotlin
+val unitSettingCallback = object : UnitSettingCallback {
+  override fun onResult(data: Int?) {
+  }
+
+  override fun onSuccess() {
+    Log.e("RWSDK", "measure unit set success")
+    DHBleSdk.dispose(this)
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "measure unit set failed: $errorCode")
+    DHBleSdk.dispose(this)
+  }
+}
+
+DHBleSdk.subscribeData(unitSettingCallback)
+DHBleSdk.setMeasureUnit(0)
+```
+
+Retrieval example:
+
+```kotlin
+val unitSettingCallback = object : UnitSettingCallback {
+  override fun onResult(data: Int?) {
+    Log.e("RWSDK", "measure unit=$data")
+    DHBleSdk.dispose(this)
+  }
+
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "measure unit get failed: $errorCode")
+    DHBleSdk.dispose(this)
+  }
+}
+
+DHBleSdk.subscribeData(unitSettingCallback)
+DHBleSdk.getMeasureUnit()
 ```
 
 #### 3.2.2 Health Data Synchronization (Real-time Single Measurement and All-day Monitoring)
