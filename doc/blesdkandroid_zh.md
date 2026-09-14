@@ -819,6 +819,8 @@ DHBleSdk.getRingBrightScreenSleepTime()
 ###### 3.2.1.14.1 消息推送
 
 >  APP主动向设备推送消息通知(非ANCS), 消息开关由APP自行控制.
+>
+> 微信等应用的来电通知不属于Android系统电话状态, APP需通过继承`NotificationListenerService`监听通知并推送.
 
 方法说明: 
 
@@ -840,28 +842,64 @@ messageBean.content = "8888"
 DHBleSdk.setPushMsgJL(messageBean)
 ```
 
-###### 3.2.1.14.2 来电控制
+###### 3.2.1.14.2 来电提醒与控制
 
-> 设备端触发接听或挂断来电时, APP需监听设备指令并执行对应电话操作.
+> APP收到系统来电时, 调用`controlCallRemindJL()`将来电信息推送到设备.
+>
+> `controlPhoneJL()`用于用户接听或挂断后, 将操作状态同步给设备.
+>
+> 设备端触发接听或挂断操作时, APP通过`CallRemindCallback`接收并处理.
+>
+> APP需通过`TelephonyManager`监听Android系统电话状态, 可注册`TelephonyManager.ACTION_PHONE_STATE_CHANGED`广播, 根据响铃、接通和挂断状态调用对应接口.
 
 方法说明:
+
+`fun controlCallRemindJL(callRemindBean: CallRemindBean)`
 
 `fun controlPhoneJL(controlType: Int)`
 
 参数说明:
 
-| 参数        | 类型 | 说明         | 值                       |
-| ----------- | ---- | ------------ | ------------------------ |
-| controlType | Int  | 来电控制类型 | 0: 接听<br>1: 挂断      |
+| 参数           | 类型             | 说明         | 值                  |
+| -------------- | ---------------- | ------------ | ------------------- |
+| callRemindBean | CallRemindBean   | 来电信息     | 见类属性定义        |
+| controlType    | Int              | 用户操作状态 | 0: 接听<br>1: 挂断 |
+
+`CallRemindCallback.onResult()`返回值:
+
+| 值 | 说明             |
+| -- | ---------------- |
+| 1  | 设备端请求接听   |
+| 2  | 设备端请求挂断   |
 
 调用示例:
 
 ```kotlin
-// 接听来电
+// APP收到系统来电后, 将来电信息推送到设备
+val callRemindBean = CallRemindBean().apply {
+    phoneNum = "13800138000"
+    phoneName = "Contact"
+}
+DHBleSdk.controlCallRemindJL(callRemindBean)
+
+// 用户接听后同步状态
 DHBleSdk.controlPhoneJL(0)
 
-// 挂断来电
+// 用户挂断后同步状态
 DHBleSdk.controlPhoneJL(1)
+
+// 接收设备端的接听或挂断操作
+DHBleSdk.subscribeData(object : CallRemindCallback {
+    override fun onResult(data: Int?) {
+        when (data) {
+            1 -> { /* 执行接听操作 */ }
+            2 -> { /* 执行挂断操作 */ }
+        }
+    }
+
+    override fun onFail(errorCode: Int) {}
+    override fun onSuccess() {}
+})
 ```
 
 ###### 3.2.1.14.3 音乐控制

@@ -831,6 +831,8 @@ DHBleSdk.getRingBrightScreenSleepTime()
 ###### 3.2.1.14.1 Message Push
 
 > APP actively pushes message notifications to the device (not ANCS). The message switch is controlled by the APP itself.
+>
+> Incoming-call notifications from WeChat and similar apps are not Android system phone states. The APP must extend `NotificationListenerService` to listen for and push these notifications.
 
 Method Description:
 
@@ -852,28 +854,64 @@ messageBean.content = "8888"
 DHBleSdk.setPushMsgJL(messageBean)
 ```
 
-###### 3.2.1.14.2 Call Control
+###### 3.2.1.14.2 Call Notification and Control
 
-> When the device triggers answering or rejecting a call, the APP should listen for the device command and perform the corresponding phone action.
+> When the APP receives an Android system call, call `controlCallRemindJL()` to push the call information to the device.
+>
+> `controlPhoneJL()` is used to synchronize the operation after the user answers or hangs up.
+>
+> When the device triggers an answer or hang-up operation, the APP receives and handles it through `CallRemindCallback`.
+>
+> The APP must use `TelephonyManager` to listen for Android system phone states. It can register for the `TelephonyManager.ACTION_PHONE_STATE_CHANGED` broadcast and call the corresponding API according to the ringing, answered, and hang-up states.
 
 Method Description:
+
+`fun controlCallRemindJL(callRemindBean: CallRemindBean)`
 
 `fun controlPhoneJL(controlType: Int)`
 
 Parameter Description:
 
-| Parameter   | Type | Description       | Value                          |
-| ----------- | ---- | ----------------- | ------------------------------ |
-| controlType | Int  | Call control type  | 0: Answer<br>1: Reject        |
+| Parameter      | Type           | Description          | Value                         |
+| -------------- | -------------- | -------------------- | ----------------------------- |
+| callRemindBean | CallRemindBean | Call information     | See the class definition      |
+| controlType    | Int            | User operation state | 0: Answer<br>1: Hang up       |
+
+`CallRemindCallback.onResult()` return values:
+
+| Value | Description                    |
+| ----- | ------------------------------ |
+| 1     | Device requests answering      |
+| 2     | Device requests hanging up     |
 
 Example of usage:
 
 ```kotlin
-// Answer call
+// Push call information to the device when the APP receives a system call
+val callRemindBean = CallRemindBean().apply {
+    phoneNum = "13800138000"
+    phoneName = "Contact"
+}
+DHBleSdk.controlCallRemindJL(callRemindBean)
+
+// Synchronize the state after the user answers
 DHBleSdk.controlPhoneJL(0)
 
-// Reject call
+// Synchronize the state after the user hangs up
 DHBleSdk.controlPhoneJL(1)
+
+// Receive answer or hang-up operations from the device
+DHBleSdk.subscribeData(object : CallRemindCallback {
+    override fun onResult(data: Int?) {
+        when (data) {
+            1 -> { /* Answer the call */ }
+            2 -> { /* Hang up the call */ }
+        }
+    }
+
+    override fun onFail(errorCode: Int) {}
+    override fun onSuccess() {}
+})
 ```
 
 ###### 3.2.1.14.3 Music Control
