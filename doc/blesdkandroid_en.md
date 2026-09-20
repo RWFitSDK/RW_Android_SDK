@@ -45,6 +45,10 @@ implementation files('libs/blesdk_rwfit_release_260130.aar')
 
 ## SDK Revision History
 
+**V2.0.0_20260920** (2026.09.20)
+
+- Separated workout reporting setting-result callbacks from live workout data callbacks (3.2.4.3).
+
 **V2.0.0_20260909** (2026.09.09)
 
 - Added metric/imperial unit settings and retrieval (3.2.1.28).
@@ -2491,6 +2495,10 @@ Method Description:
 
 `fun setExerciseMore(type: Int)`
 
+`fun setExerciseMore(type: Int, callback: CustomStatusCallback)`
+
+Use `CustomStatusCallback` for the setting result and `SportDataPushCallback.onResult()` for live workout data. Call `dispose(callback)` after handling the result or when leaving the page.
+
 Parameter Description:
 
 | Parameter | Type | Description | Value                                                        |
@@ -2501,7 +2509,17 @@ Example of usage:
 
 ```kotlin
 // Exit exercise interface
-DHBleSdk.setExerciseMore(0)
+DHBleSdk.setExerciseMore(0, object : CustomStatusCallback {
+    override fun onSuccess() {
+        DHBleSdk.dispose(this)
+        Log.d("SDK", "Workout reporting disabled")
+    }
+
+    override fun onFail(errorCode: Int) {
+        DHBleSdk.dispose(this)
+        Log.e("SDK", "setExerciseMore failed: $errorCode")
+    }
+})
 ```
 
 ##### 3.2.4.4 Get Multi-Sport Data Report

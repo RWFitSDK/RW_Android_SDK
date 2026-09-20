@@ -2510,6 +2510,10 @@ DHBleSdk.subscribeData(sportRealPushCallback)
 
 `fun setExerciseMore(type: Int)`
 
+`fun setExerciseMore(type: Int, callback: CustomStatusCallback)`
+
+设置结果通过 `CustomStatusCallback` 返回，实时运动数据通过 `SportDataPushCallback.onResult()` 接收。结果处理完或页面退出时调用 `dispose(callback)`。
+
 参数说明:
 
 | 参数 | 类型 | 说明 | 值                                            |
@@ -2522,7 +2526,17 @@ DHBleSdk.subscribeData(sportRealPushCallback)
 
 ```kotlin
 //退出运动界面
-DHBleSdk.setExerciseMore(0)
+DHBleSdk.setExerciseMore(0, object : CustomStatusCallback {
+    override fun onSuccess() {
+        DHBleSdk.dispose(this)
+        Log.d("SDK", "Workout reporting disabled")
+    }
+
+    override fun onFail(errorCode: Int) {
+        DHBleSdk.dispose(this)
+        Log.e("SDK", "setExerciseMore failed: $errorCode")
+    }
+})
 ```
 
 
@@ -2814,6 +2828,10 @@ fun unregisterSleepRawDataCallback() {
    
 
 ## SDK修订记录
+
+**v2.0.0_20260920** (2026.09.20)
+
+- 优化多运动开关设置结果回调，与实时运动数据回调分离(3.2.4.3)
 
 **v2.0.0_20260909** (2026.09.09)
 - 添加公制/英制单位设置与获取接口(3.2.1.28)
