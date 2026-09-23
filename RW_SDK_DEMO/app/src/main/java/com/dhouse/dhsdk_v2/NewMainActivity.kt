@@ -27,7 +27,7 @@ class NewMainActivity : AppCompatActivity() {
 
         DHBleSdk.initSDK(this)
         // Demo密码。客户App应在连接前传入当前账号对应的4位密码。
-        DHBleSdk.prepareAutoPassword("1234")
+        DHBleSdk.prepareAutoPassword("4567")
         DemoStateStore.attach(this)
 
         binding.bottomNavigation.setOnNavigationItemSelectedListener { item ->

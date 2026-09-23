@@ -14,11 +14,11 @@ import com.dhouse.dhsdk_v2.ui.bean.EventBusBean
 import com.example.blesdk.DHBleSdk
 import com.example.blesdk.bean.sync.NewSportBean
 import com.example.blesdk.bean.sync.SportDataPushBean
+import com.example.blesdk.callback.status.CustomStatusCallback
 import com.example.blesdk.bean.sync.SportResultBean
 import com.example.blesdk.callback.data.Sport3ResultCallback
 import com.example.blesdk.callback.data.SportDataPushCallback
 import com.example.blesdk.callback.status.SportControlCallback
-import com.example.blesdk.callback.status.CustomStatusCallback
 import com.example.blesdk.utils.BleActivityMode
 import com.example.blesdk.utils.WorkoutControlType
 import org.greenrobot.eventbus.EventBus
@@ -36,7 +36,7 @@ class WorkoutRunningActivity : AppCompatActivity() {
     private val sportRealPushCallback by lazy {
         object : SportDataPushCallback {
             override fun onSuccess() {
-                // 只接收实时运动数据，开关指令结果由 CustomStatusCallback 返回。
+                Log.e("RWSDK", "SportDataPushCallback onSuccess")
             }
 
             override fun onFail(errorCode: Int) {
@@ -95,26 +95,28 @@ class WorkoutRunningActivity : AppCompatActivity() {
         super.onStart()
 
         EventBus.getDefault().register(this)
-        // 进入运动界面
-        setWorkoutReporting(1)
+        // 进入运动界面：开启确认走设置回调，首帧数据仍由 SportDataPushCallback 收取
+        DHBleSdk.setExerciseMore(1, object : CustomStatusCallback {
+            override fun onSuccess() {
+                Log.e("RWSDK", "workout notify enabled")
+            }
+
+            override fun onFail(errorCode: Int) {
+                Log.e("RWSDK", "workout notify enable failed: $errorCode")
+            }
+        })
     }
 
     override fun onStop() {
         super.onStop()
         // 退出运动界面
-        setWorkoutReporting(0)
-    }
-
-    private fun setWorkoutReporting(type: Int) {
-        DHBleSdk.setExerciseMore(type, object : CustomStatusCallback {
+        DHBleSdk.setExerciseMore(0, object : CustomStatusCallback {
             override fun onSuccess() {
-                DHBleSdk.dispose(this)
-                Log.e("RWSDK", "setExerciseMore type=$type success")
+                Log.e("RWSDK", "workout notify disabled")
             }
 
             override fun onFail(errorCode: Int) {
-                DHBleSdk.dispose(this)
-                Log.e("RWSDK", "setExerciseMore type=$type failed: $errorCode")
+                Log.e("RWSDK", "workout notify disable failed: $errorCode")
             }
         })
     }

@@ -38,6 +38,9 @@ class HealthCellAdapter(private val onClick: (DemoHealthType) -> Unit) :
             if (item.type == DemoHealthType.WORKOUT) {
                 binding.healthValue.text = binding.root.context.getString(R.string.demo_enter_multi_sport)
                 binding.healthTime.text = ""
+            } else if (item.type == DemoHealthType.RECORDING) {
+                binding.healthValue.text = binding.root.context.getString(R.string.demo_enter_recording)
+                binding.healthTime.text = ""
             } else {
                 binding.healthValue.text = item.latest?.value ?: binding.root.context.getString(R.string.demo_no_data)
                 binding.healthTime.text = item.latest?.let {

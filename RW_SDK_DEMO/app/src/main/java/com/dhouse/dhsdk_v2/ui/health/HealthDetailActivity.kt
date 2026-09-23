@@ -66,7 +66,7 @@ class HealthDetailActivity : AppCompatActivity() {
         binding.latestValue.text = latest?.value ?: getString(R.string.demo_no_data)
         binding.latestDescription.text = latest?.detail ?: getString(R.string.demo_sync_or_measure)
         binding.emptyDetail.visibility = if (records.isEmpty()) View.VISIBLE else View.GONE
-        val supportsMeasurement = type.measurementKey != null
+        val supportsMeasurement = type.measurementDataType != null
         binding.measurementSection.visibility = if (supportsMeasurement) View.VISIBLE else View.GONE
         if (supportsMeasurement) {
             val measuring = state.activeMeasurement == type

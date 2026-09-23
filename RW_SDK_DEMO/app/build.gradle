@@ -4,6 +4,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
 
 android {
+    namespace 'com.dhouse.dhsdk_v2'
     compileSdkVersion COMPILE_SDK_VERSION as int
     buildToolsVersion BUILD_TOOLS
 
@@ -70,6 +71,7 @@ dependencies {
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     implementation 'com.google.android.material:material:1.0.0'
     implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
     implementation 'androidx.navigation:navigation-fragment:2.1.0'
     implementation 'androidx.navigation:navigation-ui:2.1.0'
     implementation 'androidx.lifecycle:lifecycle-extensions:2.1.0'
@@ -87,7 +89,7 @@ dependencies {
     //eventbus
     implementation 'org.greenrobot:eventbus:3.2.0'
     implementation 'com.github.getActivity:XXPermissions:13.2'
-    implementation files('libs/blesdk-rwfit-release_v2_260920.aar')
+    implementation files('libs/blesdk-rwfit-release_v2_260922.aar')
 
 
     implementation 'com.github.zzy0516alex:FileSelectorRelease:v6.1'

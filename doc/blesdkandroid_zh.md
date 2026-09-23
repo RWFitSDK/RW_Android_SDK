@@ -237,6 +237,9 @@ DeviceFuncV2Model类属性定义:
 | isSupportFallDetect         | 是否支持跌落提醒           |
 | isSupportRecording          | 是否支持录音功能           |
 | isSupportDevicePasswordAuth | 是否支持设备密码认证       |
+| isSupportDeviceChallenge    | 是否支持设备身份认证(HMAC-SHA256挑战应答) |
+| isSupportSedentary          | 是否支持久坐提醒设置       |
+| isDrink                     | 是否支持喝水提醒设置       |
 | isSupportScreenControl      | 是否支持即时屏幕亮灭控制   |
 | isSupportUnitSetting        | 是否支持公制/英制单位设置  |
 
@@ -249,7 +252,7 @@ DeviceFuncV2Model类属性定义:
 
 > 获取SDK版本号.
 
-方法说明: 
+方法说明:
 
 `DHBleSdk.getSDKVersion()`
 
@@ -389,27 +392,7 @@ DHBleSdk.getPowerJL()
 
 支持实时电量推送的设备，会在开始充电或停止充电时主动推送当前电量和充电状态。该能力需设备固件支持，并非固定周期持续上报；如需主动获取当前电量，请调用 `getPowerJL()`。
 
-通过 `OnDevicePushListener` 监听实时电量：
-
-```kotlin
-val powerPushListener = object : OnDevicePushListener {
-  override fun onPush(data: PushData) {
-    if (data.type != DevicePushType.POWER) return
-
-    val powerBean = data.value as? PowerBean ?: return
-    Log.e(
-      "RWSDK",
-      "realtime power=${powerBean.power}, charging=${powerBean.powerStatus}"
-    )
-  }
-}
-
-// 开始监听
-DHBleSdk.addOnDevicePushListener(powerPushListener)
-
-// 不再使用时移除，须传入添加时的同一实例
-DHBleSdk.removeOnDevicePushListener(powerPushListener)
-```
+推送类型为 `DevicePushType.POWER`, `value` 为 `PowerBean`(与 `getPowerJL()` 查询结果同实体)。接入方式见 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听-ondevicepushlistener)。
 
 
 
@@ -962,7 +945,9 @@ DHBleSdk.deviceRememberSwitchGet()
 
 ```
 
+**赞念计数实时监听**
 
+用户在设备上按键计数时, 设备会主动上报当前计数。推送类型为 `DevicePushType.MUSLIM_COUNT`, `value` 为 `MuslimCountItemBean`(count/timeMills)。接入方式见 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听-ondevicepushlistener)。
 
 ##### 3.2.1.16 获取与设置心率/血氧报警配置
 
@@ -1196,43 +1181,69 @@ DHBleSdk.getAlarmVibrationDuration()
 
 
 
-##### 3.2.1.21 触摸事件通知
+##### 3.2.1.21 设备主动推送监听 OnDevicePushListener
 
-> 设备触摸事件通知, 设备主动上报. 触摸操作无论熄屏与否都会上报, 由APP定义响应行为.
+> 设备主动上报的统一监听通道: 电量推送、录音状态推送、赞念计数上报、触摸事件等设备主动事件
+> 都经 `OnDevicePushListener` 分发, 按 `PushData.type` 区分数据。
 >
-> 订阅 `TouchEventCallback` 接收触摸事件.
->
-> **提示:** 此功能为设备端定制功能, 使用前请确认设备厂家已在固件中集成并启用; 未定制或未启用时, APP无法收到触摸事件通知.
+> 回调在 BLE 线程同步执行, 请勿执行耗时操作, 更新 UI 请切主线程。
 
-TouchEventCallback 返回 int[] 数据说明:
+PushData 结构:
 
-| 索引 | 说明     | 值                                                    |
-| ---- | -------- | ----------------------------------------------------- |
-| [0]  | 按键类型 | 1: 触摸按键(默认), 2: 跌落(需开启跌落提醒3.2.1.24)    |
-| [1]  | 触摸类型 | 1: 单击, 2: 双击, 3: 三击, 4: 长按, 5: 甩动. <br>按键类型为2(跌落)时, 触摸类型默认为1 |
+| 字段      | 类型            | 说明                                   |
+| --------- | --------------- | -------------------------------------- |
+| type      | DevicePushType  | 推送类型, 见类型说明表                 |
+| value     | Any             | 对应类型解析后的业务对象               |
+| timestamp | Long            | SDK 收到推送的 Unix 毫秒               |
 
-调用示例:
+DevicePushType 类型说明:
+
+| DevicePushType | 数据             | value 实体          | 说明章节                       |
+| -------------- | ---------------- | ------------------- | ------------------------------ |
+| POWER          | 电量与充电状态   | PowerBean           | [3.2.1.4.1 实时电量监听](#32141-实时电量监听) |
+| RECORD_STATUS  | 录音状态推送     | RecordStatusBean    | [3.2.5.2 查询录音状态](#3252-查询录音状态)   |
+| MUSLIM_COUNT   | 赞念计数实时上报 | MuslimCountItemBean | [3.2.1.15 赞念开关](#32115-获取与设置赞念是否打开) |
+| TOUCH_EVENT    | 触摸/跌落事件    | TouchEventBean      | 设备端定制功能, 需固件集成启用;<br>TouchEventBean: <br>keyType(1: 触摸按键, 2: 跌落[需开启3.2.1.24](#32124-跌落提醒设置)), <br>touchType(1: 单击, 2: 双击, 3: 三击, 4: 长按, 5: 甩动; 跌落时默认1) |
+
+方法说明:
+
+`fun addOnDevicePushListener(listener: OnDevicePushListener)`
+
+`fun removeOnDevicePushListener(listener: OnDevicePushListener)`
+
+调用示例(一个监听器按 type 分流):
 
 ```kotlin
-//在onCreate中订阅
-DHBleSdk.subscribeData(touchEventCallback)
-
-private val touchEventCallback by lazy {
-    object : TouchEventCallback {
-        override fun onResult(data: IntArray?) {
-            data?.let {
-                val keyType = it[0]   // 1:触摸按键
-                val touchType = it[1] // 1:单击 2:双击 3:三击 4:长按 5:甩动
-                Log.e("RWSDK", "TouchEvent keyType=$keyType touchType=$touchType")
-            }
-        }
-        override fun onFail(errorCode: Int) {}
-        override fun onSuccess() {}
+private val devicePushListener = object : OnDevicePushListener {
+  override fun onPush(data: PushData) {
+    when (data.type) {
+      DevicePushType.POWER -> {
+        val powerBean = data.value as? PowerBean ?: return
+        Log.e("RWSDK", "power=${powerBean.power} charging=${powerBean.powerStatus}")
+      }
+      DevicePushType.MUSLIM_COUNT -> {
+        val item = data.value as? MuslimCountItemBean ?: return
+        Log.e("RWSDK", "muslim count=${item.count}")
+      }
+      DevicePushType.TOUCH_EVENT -> {
+        val event = data.value as? TouchEventBean ?: return
+        Log.e("RWSDK", "touch keyType=${event.keyType} touchType=${event.touchType}")
+      }
+      DevicePushType.RECORD_STATUS -> {
+        val recordStatus = data.value as? RecordStatusBean ?: return
+        Log.e("RWSDK", "record recording=${recordStatus.isRecording}")
+      }
+      else -> Unit
     }
+  }
 }
+
+// 开始监听(应用级注册, 按消费者生命周期 add/remove)
+DHBleSdk.addOnDevicePushListener(devicePushListener)
+
+// 不再使用时移除，须传入添加时的同一实例
+DHBleSdk.removeOnDevicePushListener(devicePushListener)
 ```
-
-
 
 ##### 3.2.1.22 震动间隔时长设置与获取
 
@@ -1313,49 +1324,52 @@ private val factoryTestCallback by lazy {
 
 ##### 3.2.1.24 跌落提醒设置
 
-> 设置或获取跌落提醒开关. 开启后设备检测到跌落时会通过触摸事件通知(3.2.1.21)上报.
+> 设置或获取跌落提醒开关. 开启后设备检测到跌落时会通过触摸事件通知上报.
 >
-> 跌落事件通过 `TouchEventCallback` 返回, 按键类型(keyType)=2 表示跌落事件.
+> 跌落事件经 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听-ondevicepushlistener) 的 `TOUCH_EVENT` 接收, 按键类型(keyType)=2 表示跌落事件.
 >
 > 配置表属性: `isSupportFallDetect`
 >
-> 订阅 `FallDetectCallback` 获取设置/获取结果.
+> 结果经 [callback] 返回.
 
 方法说明:
 
-`fun setFallDetect(enable: Boolean)`
+`fun setFallDetect(enable: Boolean, callback: FallDetectCallback)`
 
-`fun getFallDetect()`
+`fun getFallDetect(callback: FallDetectCallback)`
 
 参数说明:
 
-| 参数   | 类型    | 说明         | 值                |
-| ------ | ------- | ------------ | ----------------- |
-| enable | Boolean | 开关         | true: 开, false: 关 |
+| 参数     | 类型               | 说明     | 值                                    |
+| -------- | ------------------ | -------- | ------------------------------------- |
+| enable   | Boolean            | 开关     | true: 开, false: 关                   |
+| callback | FallDetectCallback | 结果回调 | 设置: onSuccess()/onFail();<br>查询: onResult(Int, 0关1开); |
 
 调用示例:
 
 ```kotlin
-//获取跌落提醒开关
-DHBleSdk.subscribeData(fallDetectCallback)
-DHBleSdk.getFallDetect()
+//查询跌落提醒开关
+DHBleSdk.getFallDetect(object : FallDetectCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "fall detect query failed: $errorCode")
+    }
+    override fun onResult(data: Int) {
+        Log.e("RWSDK", "FallDetect state: $data (0=off, 1=on)")
+    }
+})
 
 //设置跌落提醒开启
-DHBleSdk.subscribeData(fallDetectCallback)
-DHBleSdk.setFallDetect(true)
-
-private val fallDetectCallback by lazy {
-    object : FallDetectCallback {
-        override fun onResult(data: Int?) {
-            Log.e("RWSDK", "FallDetect state: $data (0=off, 1=on)")
-        }
-        override fun onFail(errorCode: Int) {}
-        override fun onSuccess() {}
+DHBleSdk.setFallDetect(true, object : FallDetectCallback {
+    override fun onSuccess() {
+        Log.e("RWSDK", "FallDetect enabled")
     }
-}
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "FallDetect set failed: $errorCode")
+    }
+    override fun onResult(data: Int) = Unit
+})
 ```
-
-
 
 ##### 3.2.1.25 计数提醒间隔设置
 
@@ -1499,6 +1513,43 @@ DHBleSdk.preparePasswordReset("5678")
 DHBleSdk.connectDeviceWithModel(bleDevice)
 ```
 
+###### 3.2.1.26.4 设备身份认证
+
+`fun deviceChallenge(challengeHex: String, callback: DeviceChallengeCallback)`
+
+> 功能配置表属性：`isSupportDeviceChallenge`。仅支持该能力的设备可使用。
+>
+> 将云端生成的challenge透传给设备，设备使用出厂预置密钥计算HMAC-SHA256并返回完整response。SDK只负责发送challenge和返回设备response；**HMAC结果的业务校验由APP及云端处理**。
+
+参数说明:
+
+| 参数 | 类型 | 说明 | 值 |
+| ---- | ---- | ---- | ---- |
+| `challengeHex` | `String` | 云端生成的随机挑战值，十六进制字符串 | 64个字符(=32字节)，兼容空格/冒号/横线分隔；非法格式或长度不符本地直接回调 `onFail` |
+| `callback` | `DeviceChallengeCallback` | 结果回调 | 结果经 `onResult(data: String)` 返回response（32字节的十六进制字符串，64字符） |
+
+调用示例:
+
+```kotlin
+val challengeCallback = object : DeviceChallengeCallback {
+  override fun onResult(data: String) {
+    //32字节HMAC-SHA256 response的hex字符串，交云端校验
+    Log.e("RWSDK", "device challenge response=$data")
+  }
+
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "device challenge failed: $errorCode")
+  }
+}
+
+//challenge由云端生成（示例用随机数转hex代替）
+val challengeHex = CmdHelper.bytesToHex(ByteArray(32).also { java.util.Random().nextBytes(it) })
+DHBleSdk.deviceChallenge(challengeHex, challengeCallback)
+```
+
 ##### 3.2.1.27 即时屏幕控制
 
 > 功能配置表属性：`isSupportScreenControl`。仅支持该能力的设备可使用。
@@ -1606,6 +1657,134 @@ DHBleSdk.subscribeData(unitSettingCallback)
 DHBleSdk.getMeasureUnit()
 ```
 
+##### 3.2.1.29 久坐提醒设置与获取
+
+> 功能配置表属性：`isSupportSedentary`。仅支持该能力的设备可使用。
+>
+> 在指定时段内，设备检测到用户持续久坐超过提醒间隔后震动提醒。
+
+方法说明：
+
+`fun setSedentaryRemind(reminderBean: DrinkReminderBean, callback: ReminderSettingCallback)`
+
+`fun getSedentaryRemind(callback: ReminderSettingCallback)`
+
+> 设置结果经 `onSuccess()`/`onFail()`、查询结果经 `onResult(DrinkReminderBean)` 返回。
+
+DrinkReminderBean参数说明：
+
+| 参数 | 类型 | 说明 | 值 |
+| ---- | ---- | ---- | ---- |
+| `isOpen` | `Boolean` | 久坐提醒开关 | true: 开启; false: 关闭 |
+| `startHour` / `startMin` | `Int` | 提醒时段开始 | 0-23 / 0-59 |
+| `endHour` / `endMin` | `Int` | 提醒时段结束 | 0-23 / 0-59 |
+| `remindDuration` | `Int` | 提醒间隔，单位分钟 | 时段内持续久坐触发提醒的时间 |
+
+调用示例：
+
+```kotlin
+//查询当前配置
+DHBleSdk.getSedentaryRemind(object : ReminderSettingCallback {
+  override fun onResult(data: DrinkReminderBean?) {
+    Log.e("RWSDK", "sedentary open=${data?.isOpen} " +
+        "${data?.startHour}:${data?.startMin}-${data?.endHour}:${data?.endMin} " +
+        "interval=${data?.remindDuration}min")
+  }
+
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "sedentary query failed: $errorCode")
+  }
+})
+
+//设置：开启，09:00-18:00，间隔60分钟
+DHBleSdk.setSedentaryRemind(DrinkReminderBean().apply {
+  isOpen = true
+  startHour = 9
+  startMin = 0
+  endHour = 18
+  endMin = 0
+  remindDuration = 60
+}, object : ReminderSettingCallback {
+  override fun onResult(data: DrinkReminderBean?) {
+  }
+
+  override fun onSuccess() {
+    Log.e("RWSDK", "sedentary set success")
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "sedentary set failed: $errorCode")
+  }
+})
+```
+
+##### 3.2.1.30 喝水提醒设置与获取
+
+> 功能配置表属性：`isDrink`。仅支持该能力的设备可使用。
+>
+> 在指定时段内，设备按提醒间隔周期性震动提醒喝水。
+
+方法说明：
+
+`fun setDrinkRemind(reminderBean: DrinkReminderBean, callback: ReminderSettingCallback)`
+
+`fun getDrinkRemind(callback: ReminderSettingCallback)`
+
+> 设置结果经 `onSuccess()`/`onFail()`、查询结果经 `onResult(DrinkReminderBean)` 返回。
+
+DrinkReminderBean参数说明：
+
+| 参数 | 类型 | 说明 | 值 |
+| ---- | ---- | ---- | ---- |
+| `isOpen` | `Boolean` | 喝水提醒开关 | true: 开启; false: 关闭 |
+| `startHour` / `startMin` | `Int` | 提醒时段开始 | 0-23 / 0-59 |
+| `endHour` / `endMin` | `Int` | 提醒时段结束 | 0-23 / 0-59 |
+| `remindDuration` | `Int` | 提醒间隔，单位分钟 | 时段内喝水提醒的触发间隔 |
+
+调用示例：
+
+```kotlin
+//查询当前配置
+DHBleSdk.getDrinkRemind(object : ReminderSettingCallback {
+  override fun onResult(data: DrinkReminderBean?) {
+    Log.e("RWSDK", "drink open=${data?.isOpen} " +
+        "${data?.startHour}:${data?.startMin}-${data?.endHour}:${data?.endMin} " +
+        "interval=${data?.remindDuration}min")
+  }
+
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "drink query failed: $errorCode")
+  }
+})
+
+//设置：开启，08:00-22:00，间隔30分钟
+DHBleSdk.setDrinkRemind(DrinkReminderBean().apply {
+  isOpen = true
+  startHour = 8
+  startMin = 0
+  endHour = 22
+  endMin = 0
+  remindDuration = 30
+}, object : ReminderSettingCallback {
+  override fun onResult(data: DrinkReminderBean?) {
+  }
+
+  override fun onSuccess() {
+    Log.e("RWSDK", "drink set success")
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "drink set failed: $errorCode")
+  }
+})
+```
+
 #### 3.2.2 健康数据同步(实时单次与全天检测)
 
 > 健康数据检测有两种方式: 实时单次检测与全天检测。健康数据包括心率,血氧,压力,HRV,睡眠等, **睡眠无实时检测**。 
@@ -1618,111 +1797,67 @@ DHBleSdk.getMeasureUnit()
 
 ##### 3.2.2.1 实时检测-启动与关闭设备健康数据检测
 
-> 启动健康数据检测(心率,血氧,HRV,压力,血糖等); 
+> 健康数据单次检测(心率,血氧,HRV,压力,血糖,血压,体温);
 >
-> 订阅`HealthDataBroCallback` 测试完成设备会通知app；
->
-> 订阅`HealthDataControlCallback` 测试中实时值设备会通知app；
+> 回调 `HealthMeasurementCallback`: onStarted(开始确认) → onData(测量中实时值, 多帧) → onFinished(测量结束/失败/超时);
 
 > [!CAUTION]
 >
-> 同一时间只能开启一种健康检测类型, 必须等当前检测结束(收到完成回调)或主动关闭后, 才能启动新的检测类型. 同时开启多种会导致检测异常.
+> 同一时间只能开启一种健康检测类型, 必须等当前检测结束(收到 onFinished)或主动停止后, 才能启动新的检测类型. 同时开启多种会导致检测异常.
 
 方法说明:
 
-`fun controlHealthDataJL(healthType: Byte, testStatus: Byte)`
+`fun controlOpen(type: Int, dataType: Int, callback: HealthMeasurementCallback)`
 
 参数说明:
 
-| 参数       | 类型 | 说明         | 值                                                           |
-| ---------- | ---- | ------------ | ------------------------------------------------------------ |
-| healthType | Byte | 健康数据类型 | 心率: CmdConstants.JL_HR_DATA_TRANSFER_KEY<br>血氧: CmdConstants.JL_BO_DATA_TRANSFER_KEY<br>HRV: CmdConstants.JL_HRV_DATA_TRANSFER_KEY<br>压力: CmdConstants.JL_PRESSURE_DATA_TRANSFER_KEY<br>血糖: CmdConstants.JL_BLOODSUGAR_DATA_TRANSFER_KEY<br>血压: CmdConstants.JL_BP_DATA_TRANSFER_KEY<br>体温: CmdConstants.JL_TEMP_DATA_TRANSFER_KEY |
-| testStatus | Byte | 启动/关闭    | 启动: 1<br>关闭: 0                                           |
+| 参数     | 类型                      | 说明         | 值                                                           |
+| -------- | ------------------------- | ------------ | ------------------------------------------------------------ |
+| type     | Int                       | 启动/停止    | 1: 启动 / 0: 停止                                            |
+| dataType | Int                       | 健康数据类型 | `HealthDataType.code`, 见类型说明表                          |
+| callback | HealthMeasurementCallback | 结果回调     | onStarted: 开始确认;<br>onData(HealthRealtimeValue): 测量中实时值(dataType/timestamp/value/extraValue);<br>onFinished(HealthMeasurementResult): 测量结束(result.isSuccess)或失败/超时(result.errorCode) |
+
+HealthDataType 类型说明:
+
+| HealthDataType | 监测项     |
+| -------------- | ---------- |
+| HEART_RATE     | 心率       |
+| BLOOD_PRESSURE | 血压       |
+| TEMPERATURE    | 体温       |
+| BLOOD_OXYGEN   | 血氧       |
+| HRV            | 心率变异性 |
+| STRESS         | 压力       |
+| BLOOD_SUGAR    | 血糖       |
 
 调用示例:
 
 ```kotlin
-//启动心率测试
-DHBleSdk.subscribeData(healthDataBroCallback) //Monitor real-time health data return (监听实时健康数据返回)
-DHBleSdk.subscribeData(testHrCallback) //Monitor control command results (监听控制指令结果)
-DHBleSdk.controlHealthDataJL(CmdConstants.JL_HR_DATA_TRANSFER_KEY, 1)
+//启动心率检测
+DHBleSdk.controlOpen(1, HealthDataType.HEART_RATE.code, object : HealthMeasurementCallback {
+    override fun onStarted() {
+        Log.e("RWSDK", "心率检测已开始")
+    }
 
-//关闭心率测试
-DHBleSdk.subscribeData(testHrCallback)
-DHBleSdk.controlHealthDataJL(CmdConstants.JL_HR_DATA_TRANSFER_KEY, 0)
+    override fun onData(data: HealthRealtimeValue) {
+        Log.e("RWSDK", "实时心率: ${data.value} bpm")
+    }
 
-// 监听测量中实时数值改变
-private val healthDataBroCallback by lazy {
-  object : HealthDataBroCallback{
-    override fun onResult(data: HealthDataSyncBean?) {
-      data?.let {
-        when (it.dataType) {
-          Constants.RingHealthType.HR -> { //Heart Rate
-            Log.e("RWSDK", "Output: hr Value " + it.hrPartData.last().hr)
-          }
-          Constants.RingHealthType.HRV -> {//HRV
-            Log.e("RWSDK", "Output: HRV Value " + it.hrPartData.last().hr)
-          }
-          Constants.RingHealthType.BLOOD_OXY -> {//Blood Oxygen(血氧)
-            Log.e("RWSDK", "Output: Blood Oxygen Value " + it.boPartData.last().bo)
-          }
-          Constants.RingHealthType.PRESSURE -> {//压力 Stress
-            Log.e("RWSDK", "Output: Stress Value " + it.pressurePartData.last().pressure)
-          }
-          Constants.RingHealthType.BLOOD_SUGAR -> {//血糖 BloodSugar
-            Log.e("RWSDK", "Output: BloodSugar Value " + it.tempPartData.last().temp)
-          }
-          Constants.RingHealthType.MUSLIM_COUNT -> { //Msulim Count 赞念
-            Log.e("RWSDK", "赞念 Value " + it.muslimCountPartData.count)
-          }
-          Constants.RingHealthType.BLOOD_BP -> { //血压 Blood Pressure
-                            Log.e("RWSDK", "Blood Pressure Value " + it.bpPartData.last().dp + " " +it.bpPartData.last().sp)
-                        }
-          Constants.RingHealthType.TEMPERATURE -> { //体温 Temperature
-                            Log.e("RWSDK", "Temperature Value " + it.tempPartData.last().temp / 10.0)
-                        }
-          else -> {
-
-          }
+    override fun onFinished(result: HealthMeasurementResult) {
+        if (result.isSuccess) {
+            Log.e("RWSDK", "测量完成")
+        } else {
+            Log.e("RWSDK", "测量失败/超时: ${result.errorCode}")
         }
-      }
     }
-    override fun onFail(errorCode: Int) {
+})
 
-    }
-
-    override fun onSuccess() {
-
-    }
-
-  }
-}
-
-//监听测试完成结果
-private val testHrCallback by lazy {
-  object : HealthDataControlCallback {
-    override fun onSuccess() {
-      Log.e("RWSDK", "Output: HealthDataControlCallback Control onSuccess")
-    }
-
-    override fun onResult(data: Int?) {
-      Log.e("RWSDK", "Output: HealthDataControlCallback onResult " + data)
-      data?.let {
-        if (data >= 10){
-          Log.e("RWSDK", "Output: Measurement completed (测量完成)")
-        }
-      }
-    }
-
-    override fun onFail(errorCode: Int) {
-
-    }
-  }
-}
-
+//停止心率检测(经 onFinished 收尾)
+DHBleSdk.controlOpen(0, HealthDataType.HEART_RATE.code, object : HealthMeasurementCallback {
+    override fun onStarted() = Unit
+    override fun onData(data: HealthRealtimeValue) = Unit
+    override fun onFinished(result: HealthMeasurementResult) = Unit
+})
 ```
-
-
 
 ##### 3.2.2.2 全天检测-设置健康数据全天监听间隔
 
@@ -1730,268 +1865,169 @@ private val testHrCallback by lazy {
 >
 > **注意事项:暂间隔只有心率可设置30分钟与60分钟, 其它(血氧,HRV,压力,血糖)只能设置开与关; 开始与结束时间固定全天,不可修改.**
 
-###### 3.2.2.2.1 心率检测设置与获取
-
-> 间隔只有心率可设置30分钟与60分钟; 订阅回调: `TimedHeartRateCallback`;
-
 方法说明: 
 
-`fun setTimedHeartRateJL(reminderBean: DrinkReminderBean)`
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
 
-`fun getTimedHeartRateJL()`
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
+
+类型说明:
+
+| HealthMonitorType | 监测项        | 间隔       | 功能表属性                     |
+| ----------------- | ------------- | ---------- | ------------------------------ |
+| HEART_RATE        | 心率          | 30/60分钟  | - |
+| BLOOD_OXYGEN      | 血氧          | 固定60分钟 | isBloodOxy |
+| HRV               | 心率变异性    | 固定60分钟 | isHrv |
+| STRESS            | 压力          | 固定60分钟 | isPressure |
+| BLOOD_SUGAR       | 血糖          | 固定60分钟 | isBloodSugar |
+| BLOOD_PRESSURE    | 血压          | 固定60分钟 | isBloodPress |
+| BODY_TEMPERATURE  | 体温          | 30/60分钟  | isSupportTemperatureMonitoring |
+| PPG               | PPG定时监测   | 30/60分钟  | isSupportPPGMonitoring |
 
 参数说明:
 
-| 参数         | 类型              | 说明 | 值                                                           |
-| ------------ | ----------------- | ---- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | 类   | isOpen: true开/false关<br>remindDuration: 间隔时间30或60分钟<br>startHour: 0 固定0不能修改<br>startMin: 0 固定0不能修改<br>endHour: 23 固定23不能修改<br>endMin: 59 固定59不能修改; |
+| 参数        | 类型                    | 说明 | 值                                                           |
+| ----------- | ----------------------- | ---- | ------------------------------------------------------------ |
+| type        | HealthMonitorType       | 枚举 | 监测类型, 见类型说明表                                       |
+| monitorBean | HealthMonitorBean       | 类   | isOpen: true开/false关<br>remindDuration: 间隔时间(分钟, 见类型说明表)<br>startHour: 0 固定0不能修改<br>startMin: 0 固定0不能修改<br>endHour: 23 固定23不能修改<br>endMin: 59 固定59不能修改; |
+| callback    | ReminderSettingCallback | 接口 | 设置结果: onSuccess()/onFail();<br>查询结果: onResult(DrinkReminderBean) |
 
 调用示例:
 
 ```kotlin
-// 1. Set HeartRate Monitor(设置心率监听)
-DHBleSdk.subscribeData(hrMonitorCallback)
-val hrMonitorBean = DrinkReminderBean()
-hrMonitorBean.isOpen = true  //Heart rate monitoring switch
-hrMonitorBean.remindDuration = 60 //Heart rate monitoring interval unit is minutes, only 30 minutes and 60 minutes
-hrMonitorBean.startHour = 0 //fixed
-hrMonitorBean.startMin = 0 //fixed
-hrMonitorBean.endHour = 23 //fixed
-hrMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedHeartRateJL(hrMonitorBean)
+// 统一入口: 设置心率监测
+val monitorBean = HealthMonitorBean()
+monitorBean.isOpen = true
+monitorBean.remindDuration = 30 //间隔30分钟(心率/体温可设30或60, 其它固定60)
+monitorBean.startHour = 0 //固定
+monitorBean.startMin = 0 //固定
+monitorBean.endHour = 23 //固定
+monitorBean.endMin = 59  //固定
+DHBleSdk.setHealthMonitor(HealthMonitorType.HEART_RATE, monitorBean, object : ReminderSettingCallback {
+    override fun onSuccess() { /* 设置成功 */ }
+    override fun onFail(errorCode: Int) { /* 设置失败 */ }
+    override fun onResult(data: DrinkReminderBean?) { /* 查询结果返回(配合 getHealthMonitor) */ }
+})
 
-//1. 获取心率监听
-DHBleSdk.subscribeData(hrMonitorCallback)
-DHBleSdk.getTimedHeartRateJL()
+// 统一入口: 查询血氧监测配置
+DHBleSdk.getHealthMonitor(HealthMonitorType.BLOOD_OXYGEN, object : ReminderSettingCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) { /* 查询失败 */ }
+    override fun onResult(data: DrinkReminderBean?) { /* 当前监听配置 */ }
+})
 ```
+
+###### 3.2.2.2.1 心率检测设置与获取
+
+> 间隔只有心率可设置30分钟与60分钟; 订阅回调: `ReminderSettingCallback`;
+>
+> type 固定 `HealthMonitorType.HEART_RATE`
+
+方法说明: 
+
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
+
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
+
+
 
 ###### 3.2.2.2.2 血氧检测设置与获取
 
-> 间隔血氧只可设置60分钟; 订阅回调: `TimedBloodOxygenCallback`;
+> 间隔血氧只可设置60分钟; 订阅回调: `ReminderSettingCallback`;
 >
 > 配置表属性: `isBloodOxy` ;
+>
+> type 固定 `HealthMonitorType.BLOOD_OXYGEN`
 
 方法说明: 
 
-`fun setTimedBloodOxygenJL(reminderBean: DrinkReminderBean)`
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
 
-`fun getTimedBloodOxygenJL()`
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
 
-参数说明:
 
-| 参数         | 类型              | 说明 | 值                                                           |
-| ------------ | ----------------- | ---- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | 类   | isOpen: true开/false关<br>remindDuration: 间隔时间固定60分钟<br>startHour: 0 固定0不能修改<br>startMin: 0 固定0不能修改<br>endHour: 23 固定23不能修改<br>endMin: 59 固定59不能修改; |
-
-调用示例:
-
-```kotlin
-// 2. Set Blood oxygen Monitor(设置血氧监听)
-DHBleSdk.subscribeData(timedBloodOxygenCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true  //BloodOxygen monitoring switch
-healthMonitorBean.remindDuration = 60 //fixed 60 minutes
-healthMonitorBean.startHour = 0 //fixed
-healthMonitorBean.startMin = 0 //fixed
-healthMonitorBean.endHour = 23 //fixed
-healthMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedBloodOxygenJL(healthMonitorBean)
-
-//2. 获取血氧监听
-DHBleSdk.subscribeData(timedBloodOxygenCallback)
-DHBleSdk.getTimedBloodOxygenJL()
-```
 
 ###### 3.2.2.2.3 心率变异性(HRV)检测设置与获取
 
-> 间隔HRV只可设置60分钟; 订阅回调: `TimedHrvCallback`;
+> 间隔HRV只可设置60分钟; 订阅回调: `ReminderSettingCallback`;
 >
 > 配置表属性: `isHrv` ;
+>
+> type 固定 `HealthMonitorType.HRV`
 
 方法说明: 
 
-`fun setTimedHRVJL(reminderBean: DrinkReminderBean)`
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
 
-`fun getTimedHRVJL()`
-
-参数说明:
-
-| 参数         | 类型              | 说明 | 值                                                           |
-| ------------ | ----------------- | ---- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | 类   | isOpen: true开/false关<br>remindDuration: 间隔时间固定60分钟<br>startHour: 0 固定0不能修改<br>startMin: 0 固定0不能修改<br>endHour: 23 固定23不能修改<br>endMin: 59 固定59不能修改; |
-
-调用示例:
-
-```kotlin
-// 3. Set HRV Monitor(设置HRV监听)
-DHBleSdk.subscribeData(hrvDataCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true
-healthMonitorBean.remindDuration = 60 //fixed 60 minutes
-healthMonitorBean.startHour = 0 //fixed
-healthMonitorBean.startMin = 0 //fixed
-healthMonitorBean.endHour = 23 //fixed
-healthMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedHRVJL(healthMonitorBean)
-
-//3. 获取HRV监听
-DHBleSdk.subscribeData(hrvDataCallback)
-DHBleSdk.getTimedHRVJL()
-```
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
 
 
 
 ###### 3.2.2.2.4 压力检测设置与获取
 
-> 间隔压力只可设置60分钟; 订阅回调: `TimedStressCallback`;
+> 间隔压力只可设置60分钟; 订阅回调: `ReminderSettingCallback`;
 >
 > 配置表属性: `isPressure` ;
+>
+> type 固定 `HealthMonitorType.STRESS`
 
 方法说明: 
 
-`fun setTimedStressJL(reminderBean: DrinkReminderBean)`
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
 
-`fun getTimedStressJL()`
-
-参数说明:
-
-| 参数         | 类型              | 说明 | 值                                                           |
-| ------------ | ----------------- | ---- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | 类   | isOpen: true开/false关<br>remindDuration: 间隔时间固定60分钟<br>startHour: 0 固定0不能修改<br>startMin: 0 固定0不能修改<br>endHour: 23 固定23不能修改<br>endMin: 59 固定59不能修改; |
-
-调用示例:
-
-```kotlin
-// 4. 设置压力监听
-DHBleSdk.subscribeData(stressDataCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true  //Stress monitoring switch
-healthMonitorBean.remindDuration = 60 //fixed 60 minutes
-healthMonitorBean.startHour = 0 //fixed
-healthMonitorBean.startMin = 0 //fixed
-healthMonitorBean.endHour = 23 //fixed
-healthMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedStressJL(healthMonitorBean)
-
-//4. 获取压力监听
-DHBleSdk.subscribeData(stressDataCallback)
-DHBleSdk.getTimedStressJL()
-```
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
 
 
 
 ###### 3.2.2.2.5 血糖检测设置与获取
 
-> 间隔血糖只可设置60分钟; 订阅回调: `TimedBloodSugarCallback`;
+> 间隔血糖只可设置60分钟; 订阅回调: `ReminderSettingCallback`;
 >
 > 配置表属性: `isBloodSugar` ;
+>
+> type 固定 `HealthMonitorType.BLOOD_SUGAR`
 
 方法说明: 
 
-`fun setTimedBloodSugarJL(reminderBean: DrinkReminderBean)`
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
 
-`fun getTimedBloodSugarJL()`
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
 
-参数说明:
 
-| 参数         | 类型              | 说明 | 值                                                           |
-| ------------ | ----------------- | ---- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | 类   | isOpen: true开/false关<br>remindDuration: 间隔时间固定60分钟<br>startHour: 0 固定0不能修改<br>startMin: 0 固定0不能修改<br>endHour: 23 固定23不能修改<br>endMin: 59 固定59不能修改; |
-
-调用示例:
-
-```kotlin
-// 5. 设置血糖监听
-DHBleSdk.subscribeData(bloodSugarDataCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true  //BloodSugar monitoring switch
-healthMonitorBean.remindDuration = 60 //fixed 60 minutes
-healthMonitorBean.startHour = 0 //fixed
-healthMonitorBean.startMin = 0 //fixed
-healthMonitorBean.endHour = 23 //fixed
-healthMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedBloodSugarJL(healthMonitorBean)
-
-//5. 获取血糖监听
-DHBleSdk.subscribeData(bloodSugarDataCallback)
-DHBleSdk.getTimedBloodSugarJL()
-```
 
 
 ###### 3.2.2.2.6 血压检测设置与获取
 
-> 间隔血压只可设置60分钟; 订阅回调: `TimedBloodPressureCallback`;
+> 间隔血压只可设置60分钟; 订阅回调: `ReminderSettingCallback`;
 >
 > 配置表属性: `isBloodPress` ;
+>
+> type 固定 `HealthMonitorType.BLOOD_PRESSURE`
 
 方法说明: 
 
-`fun setTimedBloodPressureJL(reminderBean: DrinkReminderBean)`
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
 
-`fun getTimedBloodPressureJL()`
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
 
-参数说明:
 
-| 参数         | 类型              | 说明 | 值                                                           |
-| ------------ | ----------------- | ---- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | 类   | isOpen: true开/false关<br>remindDuration: 间隔时间固定60分钟<br>startHour: 0 固定0不能修改<br>startMin: 0 固定0不能修改<br>endHour: 23 固定23不能修改<br>endMin: 59 固定59不能修改; |
-
-调用示例:
-
-```kotlin
-// 6. 设置血压监听
-DHBleSdk.subscribeData(timedBloodPressureCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true  //BloodPressure monitoring switch
-healthMonitorBean.remindDuration = 60 //fixed 60 minutes
-healthMonitorBean.startHour = 0 //fixed
-healthMonitorBean.startMin = 0 //fixed
-healthMonitorBean.endHour = 23 //fixed
-healthMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedBloodPressureJL(healthMonitorBean)
-
-//6. 获取血压监听
-DHBleSdk.subscribeData(timedBloodPressureCallback)
-DHBleSdk.getTimedBloodPressureJL()
-```
 
 
 ###### 3.2.2.2.7 体温检测设置与获取
 
-> 间隔体温可设置30分钟与60分钟; 订阅回调: `TimedBodyTemperatureCallback`;
+> 间隔体温可设置30分钟与60分钟; 订阅回调: `ReminderSettingCallback`;
 >
 > 配置表属性: `isSupportTemperatureMonitoring`
+>
+> type 固定 `HealthMonitorType.BODY_TEMPERATURE`
 
 方法说明: 
 
-`fun setTimedBodyTemperature(reminderBean: DrinkReminderBean)`
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
 
-`fun getTimedBodyTemperature()`
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
 
-参数说明:
 
-| 参数         | 类型              | 说明 | 值                                                           |
-| ------------ | ----------------- | ---- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | 类   | isOpen: true开/false关<br>remindDuration: 间隔时间30或60分钟<br>startHour: 0 固定0不能修改<br>startMin: 0 固定0不能修改<br>endHour: 23 固定23不能修改<br>endMin: 59 固定59不能修改; |
-
-调用示例:
-
-```kotlin
-// 7. 设置体温监听
-DHBleSdk.subscribeData(timedBodyTemperatureCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true
-healthMonitorBean.remindDuration = 60
-healthMonitorBean.startHour = 0
-healthMonitorBean.startMin = 0
-healthMonitorBean.endHour = 23
-healthMonitorBean.endMin = 59
-DHBleSdk.setTimedBodyTemperature(healthMonitorBean)
-
-//7. 获取体温监听
-DHBleSdk.subscribeData(timedBodyTemperatureCallback)
-DHBleSdk.getTimedBodyTemperature()
-```
 
 
 
@@ -2512,7 +2548,7 @@ DHBleSdk.subscribeData(sportRealPushCallback)
 
 `fun setExerciseMore(type: Int, callback: CustomStatusCallback)`
 
-设置结果通过 `CustomStatusCallback` 返回，实时运动数据通过 `SportDataPushCallback.onResult()` 接收。结果处理完或页面退出时调用 `dispose(callback)`。
+设置结果通过 `CustomStatusCallback` 返回；运动中实时数据通过 `SportDataPushCallback.onResult()` 接收。结果处理完或页面退出时调用 `dispose(callback)`。
 
 参数说明:
 
@@ -2529,12 +2565,12 @@ DHBleSdk.subscribeData(sportRealPushCallback)
 DHBleSdk.setExerciseMore(0, object : CustomStatusCallback {
     override fun onSuccess() {
         DHBleSdk.dispose(this)
-        Log.d("SDK", "Workout reporting disabled")
+        Log.e("RWSDK", "Workout reporting disabled")
     }
 
     override fun onFail(errorCode: Int) {
         DHBleSdk.dispose(this)
-        Log.e("SDK", "setExerciseMore failed: $errorCode")
+        Log.e("RWSDK", "setExerciseMore failed: $errorCode")
     }
 })
 ```
@@ -2552,7 +2588,7 @@ DHBleSdk.setExerciseMore(0, object : CustomStatusCallback {
 返回数据SportResultBean参数说明:
 
 | SportResultBean类 | 类型            | 说明 | 值                                                           |
-| ----------------- | --------------- | ---- | ------------------------------------------------------------ |
+| ----------------- | ------------- | ---------- | ------------------------------ |
 | startTime         | long            |      | 运动开始时间戳, 单位秒(s)                                    |
 | exerciseTime      | long            |      | 运动时长,单位秒(s)                                           |
 | workModel         | BleActivityMode |      | 运动类型                                                     |
@@ -2590,6 +2626,268 @@ private val sportResult3Callback by lazy {
 ```
 
 
+
+#### 3.2.5 录音功能
+
+> 智能录音戒指的录音控制、状态查询与录音文件管理(文件列表/下载/删除/格式化);
+>
+> 配置表属性: `isSupportRecording`; 需设备硬件有支持MIC.
+
+
+
+##### 3.2.5.1 开始/停止录音
+
+> 控制设备开始或停止录音; 设备开始录音后本地保存文件.
+>
+> 结果经 [callback] 返回.
+
+方法说明: 
+
+`fun recordControl(start: Boolean, callback: RecordControlCallback)`
+
+参数说明:
+
+| 参数     | 类型                  | 说明     | 值                                    |
+| -------- | --------------------- | -------- | ------------------------------------- |
+| start    | Boolean               | 布尔类型 | true: 开始录音; false: 停止录音;      |
+| callback | RecordControlCallback | 结果回调 | onResult: 操作后的录音状态(见下表);<br>onFail: 失败; |
+
+`RecordControlCallback.onResult` 返回操作后的录音状态:
+
+| 值   | 说明   |
+| ---- | ------ |
+| 0x01 | 录音中 |
+| 0x00 | 空闲   |
+
+调用示例:
+
+```kotlin
+DHBleSdk.recordControl(true, object : RecordControlCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "record control failed: $errorCode")
+    }
+    override fun onResult(data: Int) {
+        Log.e("RWSDK", "record control result=$data") //0x01录音中 0x00空闲; 操作后可再查询完整状态(3.2.5.2)
+    }
+})
+```
+
+##### 3.2.5.2 查询录音状态
+
+> 查询设备当前是否正在录音, 以及录音区容量信息; APP连接后建议先查询一次, 确认设备录音状态.
+>
+> 结果经 [callback] 的 onResult(RecordStatusBean) 返回.
+
+方法说明: 
+
+`fun getRecordStatus(callback: RecordStatusCallback)`
+
+参数说明:
+
+| 参数     | 类型                 | 说明     | 值                            |
+| -------- | -------------------- | -------- | ----------------------------- |
+| callback | RecordStatusCallback | 结果回调 | onResult: RecordStatusBean(见下表);<br>onFail: 失败; |
+
+返回数据RecordStatusBean参数说明:
+
+| RecordStatusBean参数 | 类型    | 说明 | 值                                 |
+| -------------------- | ------- | ---- | ---------------------------------- |
+| status               | Int     | 整形 | 0x01: 录音中; 0x00: 空闲;         |
+| recording            | Boolean |      | 是否录音中                         |
+| startTime            | long    |      | 本次录音开始时间戳, 单位秒(s), 仅录音中返回; |
+| duration             | long    |      | 已录音时长, 单位秒(s), 仅录音中返回; |
+| totalCapacity        | long    |      | 录音区总容量, 单位字节(B);         |
+| remainingCapacity    | long    |      | 录音区剩余容量, 单位字节(B);       |
+
+调用示例:
+
+```kotlin
+DHBleSdk.getRecordStatus(object : RecordStatusCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "record status failed: $errorCode")
+    }
+    override fun onResult(data: RecordStatusBean) {
+        Log.e("RWSDK", "recording=${data.isRecording} duration=${data.duration}s"
+                + " remaining=${data.remainingCapacity}/${data.totalCapacity}")
+    }
+})
+```
+
+录音状态实时推送: 推送类型为 `DevicePushType.RECORD_STATUS`, `value` 为 `RecordStatusBean`(isRecording/status/startTime/duration/容量)。接入方式见 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听-ondevicepushlistener)。
+
+##### 3.2.5.3 获取录音文件列表
+
+> 获取设备上全部录音文件的元信息; 设备分页返回, SDK自动拼接, 全部接收完成后通过 [callback] 的 onResult 一次性返回完整列表.
+
+方法说明: 
+
+`fun getRecordFileList(callback: RecordFileListCallback)`
+
+参数说明:
+
+| 参数     | 类型                   | 说明     | 值                                    |
+| -------- | ---------------------- | -------- | ------------------------------------- |
+| callback | RecordFileListCallback | 结果回调 | onResult: 完整文件列表(见下表);<br>onFail: 失败; |
+
+返回数据RecordFileItemBean参数说明:
+
+| RecordFileItemBean参数 | 类型 | 说明 | 值                                       |
+| ---------------------- | ---- | ---- | ---------------------------------------- |
+| fileId                 | long |      | 文件ID, 下载(3.2.5.4)/删除(3.2.5.5)时使用; |
+| fileSize               | long |      | 文件大小, 单位字节(B);                   |
+| duration               | long |      | 录音时长, 单位秒(s);                     |
+| timestamp              | long |      | 录音时间, Unix秒时间戳, SDK已完成转换; |
+
+调用示例:
+
+```kotlin
+DHBleSdk.getRecordFileList(object : RecordFileListCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "file list failed: $errorCode")
+    }
+    override fun onResult(data: MutableList<RecordFileItemBean>) {
+        Log.e("RWSDK", "file count=${data.size}")
+        data.forEach {
+            Log.e("RWSDK", "fileId=${it.fileId} size=${it.fileSize} duration=${it.duration}s")
+        }
+    }
+})
+```
+
+##### 3.2.5.4 下载录音文件
+
+> 按文件ID下载单个录音文件内容; SDK内部自动处理分包确认与偏移校验, 传输过程中持续回调进度, `complete=true` 时 `fileData` 为完整文件数据.
+>
+> 进度与最终文件数据经 [callback] 的 onResult(RecordFileTransferBean) 多帧返回.
+>
+> **注意:** 传输为顺序传输, 暂不支持断点续传, 失败需重新下载整个文件; 传输完成前重复调用会被拒绝并回调 onFail; `fileData` 为设备原始OPUS数据, 需通过 `OpusBinConverter.convert()` 转为 Ogg Opus(.opus) 文件后播放.
+
+方法说明: 
+
+`fun transferRecordFile(fileId: Long, callback: RecordFileTransferCallback)`
+
+参数说明:
+
+| 参数     | 类型                       | 说明 | 值                                                   |
+| -------- | -------------------------- | ---- | ---------------------------------------------------- |
+| fileId   | long                       |      | 文件ID, 来自 `getRecordFileList()` 返回的 `fileId`; |
+| callback | RecordFileTransferCallback | 结果回调 | onResult: 多帧返回(见下表), complete=true 为完成帧;<br>onFail: 失败/超时/断开; |
+
+返回数据RecordFileTransferBean参数说明:
+
+| RecordFileTransferBean参数 | 类型    | 说明 | 值                                        |
+| -------------------------- | ------- | ---- | ----------------------------------------- |
+| fileType                   | Int     | 整形 | 0x01: 录音;                               |
+| duration                   | long    |      | 录音时长, 单位秒(s);                      |
+| timestamp                  | long    |      | 录音时间, Unix秒时间戳, SDK已完成转换;             |
+| fileId                     | long    |      | 文件ID;                                   |
+| format                     | Int     | 整形 | 0x02: OPUS;                               |
+| fileSize                   | long    |      | 文件总大小, 单位字节(B);                  |
+| received                   | long    |      | 已接收字节数, 单位字节(B);                |
+| progress                   | float   |      | 传输进度 0~1;                             |
+| complete                   | Boolean |      | 是否传输完成; true 时 fileData 为完整文件数据; |
+| completedAt                | long    |      | 传输完成时间戳, 单位秒(s);                |
+| filePath                   | String  |      | APP侧保存路径, 由使用方自行赋值;          |
+| fileData                   | byte[]  |      | complete=true 时为完整原始OPUS数据;       |
+
+调用示例:
+
+```kotlin
+DHBleSdk.transferRecordFile(fileId, object : RecordFileTransferCallback { //fileId来自录音文件列表
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "transfer failed: $errorCode")
+    }
+    override fun onResult(data: RecordFileTransferBean) {
+        val percent = (data.progress * 100).toInt()
+        Log.e("RWSDK", "transfer ${data.received}/${data.fileSize} bytes ($percent%)")
+        if (data.isComplete) {
+            //原始OPUS数据转Ogg Opus文件后保存
+            val opusBytes = OpusBinConverter.convert(data.fileData ?: ByteArray(0))
+            val file = File(dir, "${data.fileId}_${data.duration}_${data.completedAt}.opus")
+            file.writeBytes(opusBytes)
+        }
+    }
+})
+```
+
+##### 3.2.5.5 删除录音文件
+
+> 按文件ID删除设备上的单个录音文件.
+>
+> 结果经 [callback] 返回.
+
+方法说明: 
+
+`fun deleteRecordFile(fileId: Long, callback: RecordFileDeleteCallback)`
+
+参数说明:
+
+| 参数     | 类型                     | 说明 | 值                                                   |
+| -------- | ------------------------ | ---- | ---------------------------------------------------- |
+| fileId   | long                     |      | 文件ID, 来自 `getRecordFileList()` 返回的 `fileId`; |
+| callback | RecordFileDeleteCallback | 结果回调 | onResult: 状态码(见下表);<br>onFail: 失败;        |
+
+`RecordFileDeleteCallback.onResult` 返回状态码:
+
+| 值   | 说明 |
+| ---- | ---- |
+| 0x00 | 成功 |
+| 其它 | 失败 |
+
+调用示例:
+
+```kotlin
+DHBleSdk.deleteRecordFile(fileId, object : RecordFileDeleteCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "delete failed: $errorCode")
+    }
+    override fun onResult(data: Int) {
+        Log.e("RWSDK", "delete result=$data") //0x00成功
+    }
+})
+```
+
+##### 3.2.5.6 格式化录音区
+
+> 清空设备录音区, **删除设备上全部录音文件, 不可恢复, 需二次确认后调用.**
+>
+> 结果经 [callback] 返回.
+
+方法说明: 
+
+`fun formatRecordStorage(callback: RecordFormatCallback)`
+
+参数说明:
+
+| 参数     | 类型                  | 说明     | 值                            |
+| -------- | --------------------- | -------- | ----------------------------- |
+| callback | RecordFormatCallback  | 结果回调 | onResult: 状态码(见下表);<br>onFail: 失败; |
+
+`RecordFormatCallback.onResult` 返回状态码:
+
+| 值   | 说明 |
+| ---- | ---- |
+| 0x00 | 成功 |
+| 其它 | 失败 |
+
+调用示例:
+
+```kotlin
+DHBleSdk.formatRecordStorage(object : RecordFormatCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "format failed: $errorCode")
+    }
+    override fun onResult(data: Int) {
+        Log.e("RWSDK", "format result=$data") //0x00成功
+    }
+})
+```
 
 #### 5.2.5 传感器原始数据
 
@@ -2633,37 +2931,47 @@ PPG/ACC/PPG Red/IR历史采集的 `sensorType` 合法组合:
 >
 > 配置表属性: `isSupportPPGMonitoring`
 >
-> 订阅 `TimedPPGCallback` 获取结果.
+> 订阅 `ReminderSettingCallback` 获取结果.
+>
+> type 固定 `HealthMonitorType.PPG`
 
 方法说明:
 
-`fun setTimedPPGJL(reminderBean: DrinkReminderBean)`
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)` 
 
-`fun getTimedPPGJL()`
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)` 
 
 参数说明:
 
-| 参数         | 类型              | 说明 | 值                                                           |
-| ------------ | ----------------- | ---- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | 类   | isOpen: true开/false关<br>remindDuration: 间隔时间默认30分钟<br>startHour: 0 固定<br>startMin: 0 固定<br>endHour: 23 固定<br>endMin: 59 固定 |
+| 参数        | 类型                    | 说明 | 值                                                           |
+| ----------- | ----------------------- | ---- | ------------------------------------------------------------ |
+| type        | HealthMonitorType       | 枚举 | 固定 `HealthMonitorType.PPG`                                 |
+| monitorBean | HealthMonitorBean       | 类   | isOpen: true开/false关<br>remindDuration: 间隔时间默认30分钟<br>startHour: 0 固定<br>startMin: 0 固定<br>endHour: 23 固定<br>endMin: 59 固定 |
+| callback    | ReminderSettingCallback | 接口 | 设置结果: onSuccess()/onFail();<br>查询结果: onResult(DrinkReminderBean) |
 
 调用示例:
 
 ```kotlin
 //设置PPG监听
-DHBleSdk.subscribeData(ppgDataCallback)
-val healthMonitorBean = DrinkReminderBean()
+val healthMonitorBean = HealthMonitorBean()
 healthMonitorBean.isOpen = true
 healthMonitorBean.remindDuration = 60
 healthMonitorBean.startHour = 0
 healthMonitorBean.startMin = 0
 healthMonitorBean.endHour = 23
 healthMonitorBean.endMin = 59
-DHBleSdk.setTimedPPGJL(healthMonitorBean)
+DHBleSdk.setHealthMonitor(HealthMonitorType.PPG, healthMonitorBean, object : ReminderSettingCallback {
+    override fun onSuccess() { /* 设置成功 */ }
+    override fun onFail(errorCode: Int) { /* 设置失败 */ }
+    override fun onResult(data: DrinkReminderBean?) { /* 查询结果返回(配合 getHealthMonitor) */ }
+})
 
 //获取PPG监听
-DHBleSdk.subscribeData(ppgDataCallback)
-DHBleSdk.getTimedPPGJL()
+DHBleSdk.getHealthMonitor(HealthMonitorType.PPG, object : ReminderSettingCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) { /* 查询失败 */ }
+    override fun onResult(data: DrinkReminderBean?) { /* 当前PPG监听配置 */ }
+})
 ```
 
 
@@ -2829,11 +3137,16 @@ fun unregisterSleepRawDataCallback() {
 
 ## SDK修订记录
 
-**v2.0.0_20260920** (2026.09.20)
+**v2.0.0_20260922** (2026.09.22)
 
-- 优化多运动开关设置结果回调，与实时运动数据回调分离(3.2.4.3)
+- 添加录音功能接口(3.2.5), 功能配置表添加`isSupportRecording`
+- 添加设备身份认证接口(3.2.1.26.4), 功能配置表添加`isSupportDeviceChallenge`
+- 添加久坐提醒设置与获取接口(3.2.1.29), 功能配置表添加`isSupportSedentary`
+- 添加喝水提醒设置与获取接口(3.2.1.30), 功能配置表添加`isDrink`
+- 添加健康监测(全天检测)统一设置接口 `setHealthMonitor`/`getHealthMonitor`(3.2.2.2)与单次实时检测接口 `controlOpen`(3.2.2.1); 旧接口保留可用
 
 **v2.0.0_20260909** (2026.09.09)
+
 - 添加公制/英制单位设置与获取接口(3.2.1.28)
 - 电量数据新增充电状态及实时电量监听(3.2.1.4)
 - Android最低支持版本调整为Android 7.0（API 24）

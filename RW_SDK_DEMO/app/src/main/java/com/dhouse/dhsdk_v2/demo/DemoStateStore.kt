@@ -12,16 +12,23 @@ import com.example.blesdk.DHBleSdk
 import com.example.blesdk.bean.function.FirmVersionBean
 import com.example.blesdk.bean.function.PowerBean
 import com.example.blesdk.bean.function.SupportMenuBean
+import com.example.blesdk.bean.function.TouchEventBean
 import com.example.blesdk.bean.sync.*
 import com.example.blesdk.ble.bean.BleDevice
 import com.example.blesdk.blering.RingBleError
 import com.example.blesdk.blering.RingConnectBleCallback
 import com.example.blesdk.callback.HealthDataSyncCallback
+import com.example.blesdk.callback.data.HealthMeasurementCallback
+import com.example.blesdk.blering.OnDevicePushListener
+import com.example.blesdk.blering.DevicePushType
+import com.example.blesdk.blering.PushData
+import com.example.blesdk.bean.sync.MuslimCountItemBean
+import com.example.blesdk.callback.data.HealthMeasurementResult
+import com.example.blesdk.callback.data.HealthRealtimeValue
+import com.example.blesdk.blering.HealthDataType
 import com.example.blesdk.callback.data.FirmwareCallback
-import com.example.blesdk.callback.data.HealthDataBroCallback
 import com.example.blesdk.callback.data.PowerCallback
 import com.example.blesdk.callback.data.TakePhotoCallback
-import com.example.blesdk.callback.status.HealthDataControlCallback
 import com.example.blesdk.callback.status.MusicPushSettingCallback
 import com.example.blesdk.utils.Constants
 import java.text.SimpleDateFormat
@@ -53,36 +60,34 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
     private val listeners = CopyOnWriteArraySet<(DemoUiState) -> Unit>()
     private var appContext: Context? = null
     private var callbacksSubscribed = false
-    private var measurementTimeout: Runnable? = null
     private val stepDays = linkedMapOf<String, StepDayData>()
 
     @Volatile
     var state: DemoUiState = DemoUiState()
         private set
 
-    private val realtimeCallback = object : HealthDataBroCallback {
-        override fun onResult(data: HealthDataSyncBean?) {
-            data ?: return
-            val result = realtimeRecord(data) ?: return
-            updateRealtimeValue(result.first, result.second)
-        }
-
-        override fun onSuccess() = Unit
-        override fun onFail(errorCode: Int) = Unit
-    }
-
-    private val measurementCallback = object : HealthDataControlCallback {
-        override fun onResult(data: Int?) {
-            if (data != null && data >= 10) {
-                clearMeasurementTimeout()
-                update { it.copy(activeMeasurement = null) }
+    /** 设备主动推送(常驻): 赞念计数 + 电量推送 + 触摸事件, 一个监听器按 type 分流; BLE线程回调, 转主线程更新。
+     *  电量实体与 getPowerJL 查询共用 PowerBean(同一纯解析函数)。 */
+    private val devicePushListener = object : OnDevicePushListener {
+        override fun onPush(data: PushData) {
+            when (data.type) {
+                DevicePushType.MUSLIM_COUNT -> {
+                    val item = data.value as? MuslimCountItemBean ?: return
+                    mainHandler.post {
+                        updateRealtimeValue(DemoHealthType.MUSLIM_COUNT,
+                            DemoHealthRecord(normalizeSeconds(item.timeMills), text(R.string.demo_count_value, item.count), text(R.string.demo_realtime_data)))
+                    }
+                }
+                DevicePushType.POWER -> {
+                    val powerBean = data.value as? PowerBean ?: return
+                    mainHandler.post { update { it.copy(battery = powerBean.power) } }
+                }
+                DevicePushType.TOUCH_EVENT -> {
+                    val event = data.value as? TouchEventBean ?: return
+                    Log.e("RWSDK", "Touch push keyType=${event.keyType} touchType=${event.touchType}")
+                }
+                else -> Unit
             }
-        }
-
-        override fun onSuccess() = Unit
-        override fun onFail(errorCode: Int) {
-            clearMeasurementTimeout()
-            update { it.copy(activeMeasurement = null) }
         }
     }
 
@@ -122,10 +127,9 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
         DHBleSdk.setConnectBleCallback(this)
         if (!callbacksSubscribed) {
             callbacksSubscribed = true
-            DHBleSdk.subscribeData(realtimeCallback)
-            DHBleSdk.subscribeData(measurementCallback)
             DHBleSdk.subscribeData(takePhotoCallback)
             DHBleSdk.subscribeData(musicPushSettingCallback)
+            DHBleSdk.addOnDevicePushListener(devicePushListener)
         }
         refreshFromApplication()
     }
@@ -167,7 +171,6 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
     }
 
     fun disconnect() {
-        clearMeasurementTimeout()
         update {
             it.copy(
                 connected = false,
@@ -200,27 +203,34 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
     }
 
     fun startMeasurement(type: DemoHealthType) {
-        val key = type.measurementKey ?: return
+        val dataType = type.measurementDataType ?: return
         if (!state.ready) return
-        clearMeasurementTimeout()
         update { it.copy(activeMeasurement = type) }
-        DHBleSdk.controlHealthDataJL(key, 1)
-        val timeout = Runnable {
-            if (state.activeMeasurement == type) {
-                DHBleSdk.controlHealthDataJL(key, 0)
+        DHBleSdk.controlOpen(1, dataType, object : HealthMeasurementCallback {
+            override fun onStarted() = Unit
+            override fun onData(data: HealthRealtimeValue) {
+                val type = DemoHealthType.values().firstOrNull { it.measurementDataType == data.dataType } ?: return
+                val valueText = when (data.dataType) {
+                    HealthDataType.BLOOD_PRESSURE.code -> "${data.value.toInt()}/${data.extraValue.toInt()} mmHg"
+                    HealthDataType.BLOOD_SUGAR.code, HealthDataType.TEMPERATURE.code -> "%.1f".format(data.value) + " ${type.unit}"
+                    else -> "${data.value.toInt()} ${type.unit}".trim()
+                }
+                updateRealtimeValue(type, DemoHealthRecord(normalizeSeconds(data.timestamp), valueText, text(R.string.demo_realtime_measurement)))
+            }
+            override fun onFinished(result: HealthMeasurementResult) {
                 update { it.copy(activeMeasurement = null) }
             }
-            measurementTimeout = null
-        }
-        measurementTimeout = timeout
-        mainHandler.postDelayed(timeout, MEASUREMENT_TIMEOUT_MS)
+        })
     }
 
     fun stopMeasurement(type: DemoHealthType) {
-        val key = type.measurementKey ?: return
-        clearMeasurementTimeout()
-        DHBleSdk.controlHealthDataJL(key, 0)
+        val dataType = type.measurementDataType ?: return
         update { it.copy(activeMeasurement = null) }
+        DHBleSdk.controlOpen(0, dataType, object : HealthMeasurementCallback {
+            override fun onStarted() = Unit
+            override fun onData(data: HealthRealtimeValue) = Unit
+            override fun onFinished(result: HealthMeasurementResult) = Unit
+        })
     }
 
     fun refreshDeviceInfo() {
@@ -265,7 +275,6 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
     }
 
     override fun onRingConnectFailed(device: BleDevice?, reason: RingBleError) {
-        clearMeasurementTimeout()
         update {
             it.copy(
                 connected = false,
@@ -415,39 +424,6 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
         })
     }
 
-    private fun realtimeRecord(data: HealthDataSyncBean): Pair<DemoHealthType, DemoHealthRecord>? {
-        val now = System.currentTimeMillis() / 1000L
-        return when (data.dataType) {
-            Constants.RingHealthType.HR -> data.hrPartData?.lastOrNull()?.let {
-                DemoHealthType.HEART_RATE to DemoHealthRecord(normalizeSeconds(it.time), "${it.hr} bpm", text(R.string.demo_realtime_measurement))
-            }
-            Constants.RingHealthType.HRV -> data.hrPartData?.lastOrNull()?.let {
-                DemoHealthType.HRV to DemoHealthRecord(normalizeSeconds(it.time), "${it.hr} ms", text(R.string.demo_realtime_measurement))
-            }
-            Constants.RingHealthType.BLOOD_OXY -> data.boPartData?.lastOrNull()?.let {
-                DemoHealthType.BLOOD_OXYGEN to DemoHealthRecord(normalizeSeconds(it.time), "${it.bo}%", text(R.string.demo_realtime_measurement))
-            }
-            Constants.RingHealthType.PRESSURE -> data.pressurePartData?.lastOrNull()?.let {
-                DemoHealthType.PRESSURE to DemoHealthRecord(normalizeSeconds(it.time), it.pressure.toString(), text(R.string.demo_realtime_measurement))
-            }
-            Constants.RingHealthType.BLOOD_BP -> data.bpPartData?.lastOrNull()?.let {
-                DemoHealthType.BLOOD_PRESSURE to DemoHealthRecord(normalizeSeconds(it.time), "${it.sp}/${it.dp} mmHg", text(R.string.demo_realtime_measurement))
-            }
-            Constants.RingHealthType.BLOOD_SUGAR -> data.tempPartData?.lastOrNull()?.let {
-                DemoHealthType.BLOOD_SUGAR to DemoHealthRecord(normalizeSeconds(it.time), "%.1f mmol/L".format(it.temp / 10f), text(R.string.demo_realtime_measurement))
-            }
-            Constants.RingHealthType.TEMPERATURE -> data.tempPartData?.lastOrNull()?.let {
-                DemoHealthType.TEMPERATURE to DemoHealthRecord(normalizeSeconds(it.time), "%.1f ℃".format(it.temp / 10f), text(R.string.demo_realtime_measurement))
-            }
-            Constants.RingHealthType.MUSLIM_COUNT -> data.muslimCountPartData?.let {
-                DemoHealthType.MUSLIM_COUNT to DemoHealthRecord(normalizeSeconds(it.timeMills), text(R.string.demo_count_value, it.count), text(R.string.demo_realtime_data))
-            }
-            else -> null
-        }?.let { pair ->
-            pair.first to pair.second.copy(timestampSeconds = pair.second.timestampSeconds.takeIf { it > 0 } ?: now)
-        }
-    }
-
     private fun updateRealtimeValue(type: DemoHealthType, record: DemoHealthRecord) {
         update { current ->
             val map = current.realtimeValues.toMutableMap()
@@ -506,11 +482,6 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
         return if (args.isEmpty()) context.getString(resId) else context.getString(resId, *args)
     }
 
-    private fun clearMeasurementTimeout() {
-        measurementTimeout?.let(mainHandler::removeCallbacks)
-        measurementTimeout = null
-    }
-
     private data class StepDayData(
         val dayTimestamp: Long,
         val summary: DemoHealthRecord,
@@ -518,5 +489,4 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
     )
 
     private val DAY_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    private const val MEASUREMENT_TIMEOUT_MS = 120_000L
 }

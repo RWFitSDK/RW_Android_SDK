@@ -84,6 +84,8 @@
     <string name="demo_health_temperature">Temperature</string>
     <string name="demo_health_muslim_count">Tasbeeh count</string>
     <string name="demo_multi_sport">Multi-sport</string>
+    <string name="demo_recording">Recording</string>
+    <string name="demo_enter_recording">Tap to manage recordings</string>
     <string name="demo_enter_multi_sport">Tap to select a workout</string>
     <string name="demo_workout_type">Workout type</string>
     <string name="demo_steps_value">%1$d steps</string>
@@ -166,6 +168,14 @@
     <string name="demo_count_reminder_desc">Set reminder interval</string>
     <string name="demo_fall_alert">Fall alert</string>
     <string name="demo_fall_alert_desc">Enable or disable fall detection</string>
+    <string name="demo_sedentary">Sedentary reminder</string>
+    <string name="demo_sedentary_desc">Set period, time range and interval</string>
+    <string name="demo_sedentary_interval">Reminder interval</string>
+    <string name="demo_drink_reminder">Drink reminder</string>
+    <string name="demo_drink_reminder_desc">Set period and reminder interval</string>
+    <string name="demo_drink_reminder_interval">Reminder interval</string>
+    <string name="demo_device_challenge">Device challenge</string>
+    <string name="demo_device_challenge_desc">Send random challenge and show HMAC response</string>
     <string name="demo_tasbeeh_switch">Tasbeeh switch</string>
     <string name="demo_tasbeeh_switch_desc">Enable or disable Tasbeeh</string>
     <string name="demo_tasbeeh_time_display">Tasbeeh time display</string>
@@ -178,7 +188,12 @@
     <string name="demo_firmware_upgrade_desc">Select a local firmware file to start OTA</string>
     <string name="demo_select_firmware">Select firmware</string>
     <string name="demo_ota_demo_title">OTA integration</string>
-    <string name="demo_ota_demo_message">A firmware file is required. After selecting a valid file, call DHBleSdk.ringOtaWithFileData(filePath, callback). This Demo entry does not start an actual upgrade.</string>
+    <string name="demo_ota_demo_message">A firmware file is required. After selecting a valid file, call DHBleSdk.ringOtaWithFileData(filePath, callback).</string>
+    <string name="demo_ota_select_package">Select firmware package</string>
+    <string name="demo_ota_progress">Upgrading %1$s (%2$d%%)</string>
+    <string name="demo_ota_success">OTA success</string>
+    <string name="demo_ota_failed">OTA failed: 0x%1$s</string>
+    <string name="demo_ota_copy_failed">Copy firmware failed: %1$s</string>
 
     <string name="demo_find_sent">Find command sent</string>
     <string name="demo_enter_camera_mode">Enter camera mode</string>

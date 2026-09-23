@@ -43,34 +43,6 @@ implementation files('libs/blesdk_rwfit_release_260130.aar')
 ```
 
 
-## SDK Revision History
-
-**V2.0.0_20260920** (2026.09.20)
-
-- Separated workout reporting setting-result callbacks from live workout data callbacks (3.2.4.3).
-
-**V2.0.0_20260909** (2026.09.09)
-
-- Added metric/imperial unit settings and retrieval (3.2.1.28).
-- Added charging status and real-time battery monitoring (3.2.1.4).
-- Lowered the minimum supported Android version to Android 7.0 (API 24).
-
-**V2.0.0_20260820** (2026.08.20)
-
-- Added the `setDeviceTime` custom device-time API for debugging and testing.
-- Added authorized password reset support (3.2.1.26.3).
-
-**V2.0.0_20260817** (2026.08.17)
-
-- Added instant screen control (3.2.1.27).
-- Fixed alarm retrieval so that `onResult` returns an empty list when the device has no alarms.
-- Added the available-firmware endpoint and OTA device-model/version validation guidance (3.2.3.1).
-
-**V2.0.0_20260724** (2026.07.24)
-
-- Added support for step-detail intervals.
-
-
 **Step 3: You need to enable Bluetooth on your phone and grant Bluetooth and location permissions.**
 
 ```kotlin
@@ -264,6 +236,11 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportCountReminder      | Does it support count reminder interval setting?             |
 | isSupportSensorRawACC       | Does it support ACC raw data?                                |
 | isSupportSensorRawPPGRed    | Does it support PPG Red raw data?                            |
+| isSupportRecording          | Does it support recording?                                   |
+| isSupportDevicePasswordAuth | Does it support device password authentication?              |
+| isSupportDeviceChallenge    | Does it support device identity authentication (HMAC-SHA256 challenge-response)? |
+| isSupportSedentary          | Does it support sedentary reminder setting?                  |
+| isDrink                     | Does it support drinking reminder setting?                   |
 | isSupportSensorRawIR        | Does it support IR (infrared) raw data?                      |
 | isSupportSensorRawSleep     | Does it support sleep real-time data?                        |
 | isSupportFallDetect         | Does it support fall detection alert?                        |
@@ -417,27 +394,7 @@ DHBleSdk.getPowerJL()
 
 Supported devices actively push the current battery level and charging status when charging starts or stops. This capability requires device firmware support and is not a periodic update. Call `getPowerJL()` when the app needs to actively query the current battery level.
 
-Listen for real-time battery updates through `OnDevicePushListener`:
-
-```kotlin
-val powerPushListener = object : OnDevicePushListener {
-  override fun onPush(data: PushData) {
-    if (data.type != DevicePushType.POWER) return
-
-    val powerBean = data.value as? PowerBean ?: return
-    Log.e(
-      "RWSDK",
-      "realtime power=${powerBean.power}, charging=${powerBean.powerStatus}"
-    )
-  }
-}
-
-// Start listening.
-DHBleSdk.addOnDevicePushListener(powerPushListener)
-
-// Remove the same listener instance when it is no longer needed.
-DHBleSdk.removeOnDevicePushListener(powerPushListener)
-```
+The push type is `DevicePushType.POWER` and `value` is a `PowerBean` (same entity as the `getPowerJL()` query result). See [3.2.1.21 Device Push Notification](#32121-device-push-notification-ondevicepushlistener) for how to subscribe.
 
 ##### 3.2.1.5 Getting and Setting Video Control Switch
 
@@ -978,6 +935,10 @@ DHBleSdk.deviceRememberSwitchGet()
 
 ```
 
+**Muslim Count Real-time Monitoring**
+
+When the user taps the counter on the device, the device actively reports the current count. The push type is `DevicePushType.MUSLIM_COUNT` and `value` is a `MuslimCountItemBean` (count/timeMills). See [3.2.1.21 Device Push Notification](#32121-device-push-notification-ondevicepushlistener) for how to subscribe.
+
 ##### 3.2.1.16 Getting and Setting Heart Rate/Blood Oxygen Alarm Configuration
 
 > This function sets the heart rate and blood oxygen notification alarm data; alarm notifications will be sent in real-time via `HrBoActualReminderCallback`.
@@ -1198,43 +1159,68 @@ DHBleSdk.getAlarmVibrationDuration()
 
 
 
-##### 3.2.1.21 Touch Event Notification
+##### 3.2.1.21 Device Push Notification OnDevicePushListener
 
-> Device touch event notification, actively reported by the device. Touch operations are reported regardless of screen state. The APP defines the response behavior.
+> The unified channel for device-initiated reports: device events such as battery push, recording status push, Muslim count reporting and touch events are all dispatched through `OnDevicePushListener`, distinguished by `PushData.type`.
 >
-> Subscribe to `TouchEventCallback` to receive touch events.
->
-> **Note:** This is a device-side customization. Before using it, confirm that the device manufacturer has integrated and enabled it in the firmware. If it has not been customized or enabled, the APP will not receive touch event notifications.
+> The callback runs synchronously on the BLE thread. Do not perform time-consuming work; switch to the main thread before updating the UI.
 
-TouchEventCallback returns int[] data:
+PushData structure:
 
-| Index | Description | Value                                                    |
-| ----- | ----------- | -------------------------------------------------------- |
-| [0]   | Key type    | 1: Touch key (default), 2: Fall (requires fall detect enabled 3.2.1.24) |
-| [1]   | Touch type  | 1: Single tap, 2: Double tap, 3: Triple tap, 4: Long press, 5: Flick. <br>When key type=2 (fall), touch type defaults to 1 |
+| Field     | Type            | Description                                        |
+| --------- | --------------- | -------------------------------------------------- |
+| type      | DevicePushType  | Push type, see the type table below                |
+| value     | Any             | Parsed business object of the corresponding type   |
+| timestamp | Long            | Unix milliseconds when the SDK received the push   |
 
-Example of usage:
+DevicePushType description:
+
+| DevicePushType | Data                        | value entity        | See                                             |
+| -------------- | --------------------------- | ------------------- | ----------------------------------------------- |
+| POWER          | Battery and charging status | PowerBean           | [3.2.1.4.1 Real-time Battery Monitoring](#32141-real-time-battery-monitoring) |
+| RECORD_STATUS  | Recording status push       | RecordStatusBean    | [3.2.5.2 Query Recording Status](#3252-query-recording-status) |
+| MUSLIM_COUNT   | Muslim count real-time report | MuslimCountItemBean | [3.2.1.15 Reminder Function](#32115-getting-and-setting-whether-the-reminder-function-is-enabled) |
+| TOUCH_EVENT    | Touch / fall event          | TouchEventBean      | Touch and fall are reported regardless of whether the screen is on (a device-customized feature that requires firmware integration);<br>TouchEventBean: keyType (1: touch key, 2: fall [requires enabling 3.2.1.24](#32124-fall-detection-setting)), touchType (1: single tap, 2: double tap, 3: triple tap, 4: long press, 5: shake; defaults to 1 for fall) |
+
+Method Description:
+
+`fun addOnDevicePushListener(listener: OnDevicePushListener)`
+
+`fun removeOnDevicePushListener(listener: OnDevicePushListener)`
+
+Example of usage (one listener dispatching by type):
 
 ```kotlin
-//Subscribe in onCreate
-DHBleSdk.subscribeData(touchEventCallback)
-
-private val touchEventCallback by lazy {
-    object : TouchEventCallback {
-        override fun onResult(data: IntArray?) {
-            data?.let {
-                val keyType = it[0]   // 1: Touch key
-                val touchType = it[1] // 1: Single tap, 2: Double tap, 3: Triple tap, 4: Long press, 5: Flick
-                Log.e("RWSDK", "TouchEvent keyType=$keyType touchType=$touchType")
-            }
-        }
-        override fun onFail(errorCode: Int) {}
-        override fun onSuccess() {}
+private val devicePushListener = object : OnDevicePushListener {
+  override fun onPush(data: PushData) {
+    when (data.type) {
+      DevicePushType.POWER -> {
+        val powerBean = data.value as? PowerBean ?: return
+        Log.e("RWSDK", "power=${powerBean.power} charging=${powerBean.powerStatus}")
+      }
+      DevicePushType.MUSLIM_COUNT -> {
+        val item = data.value as? MuslimCountItemBean ?: return
+        Log.e("RWSDK", "muslim count=${item.count}")
+      }
+      DevicePushType.TOUCH_EVENT -> {
+        val event = data.value as? TouchEventBean ?: return
+        Log.e("RWSDK", "touch keyType=${event.keyType} touchType=${event.touchType}")
+      }
+      DevicePushType.RECORD_STATUS -> {
+        val recordStatus = data.value as? RecordStatusBean ?: return
+        Log.e("RWSDK", "record recording=${recordStatus.isRecording}")
+      }
+      else -> Unit
     }
+  }
 }
+
+// Start listening (application-level registration, add/remove per consumer lifecycle).
+DHBleSdk.addOnDevicePushListener(devicePushListener)
+
+// Remove the same listener instance when it is no longer needed.
+DHBleSdk.removeOnDevicePushListener(devicePushListener)
 ```
-
-
 
 ##### 3.2.1.22 Vibration Interval Setting and Getting
 
@@ -1315,49 +1301,52 @@ private val factoryTestCallback by lazy {
 
 ##### 3.2.1.24 Fall Detection Setting
 
-> Set or get the fall detection alert switch. When enabled, the device will report fall events via touch event notification (3.2.1.21).
+> Set or get the fall detection switch. When enabled, the device reports through the touch event notification when a fall is detected.
 >
-> Fall events are reported through `TouchEventCallback`, with keyType=2 indicating a fall event.
+> Fall events are received via the `TOUCH_EVENT` type of [3.2.1.21 Device Push Notification](#32121-device-push-notification-ondevicepushlistener); keyType=2 indicates a fall event.
 >
-> Configuration table property: `isSupportFallDetect`
+> Configuration table attribute: `isSupportFallDetect`
 >
-> Subscribe to `FallDetectCallback` to get set/get results.
+> The result is returned via [callback].
 
 Method Description:
 
-`fun setFallDetect(enable: Boolean)`
+`fun setFallDetect(enable: Boolean, callback: FallDetectCallback)`
 
-`fun getFallDetect()`
+`fun getFallDetect(callback: FallDetectCallback)`
 
 Parameter Description:
 
-| Parameter | Type    | Description | Value              |
-| --------- | ------- | ----------- | ------------------ |
-| enable    | Boolean | Switch      | true: on, false: off |
+| Parameter | Type               | Description    | Value                                                      |
+| --------- | ------------------ | -------------- | ---------------------------------------------------------- |
+| enable    | Boolean            | Switch         | true: on, false: off                                       |
+| callback  | FallDetectCallback | Result callback | Set: onSuccess()/onFail();<br>Query: onResult(Int, 0=off 1=on); |
 
 Example of usage:
 
 ```kotlin
-//Get fall detect switch
-DHBleSdk.subscribeData(fallDetectCallback)
-DHBleSdk.getFallDetect()
-
-//Set fall detect on
-DHBleSdk.subscribeData(fallDetectCallback)
-DHBleSdk.setFallDetect(true)
-
-private val fallDetectCallback by lazy {
-    object : FallDetectCallback {
-        override fun onResult(data: Int?) {
-            Log.e("RWSDK", "FallDetect state: $data (0=off, 1=on)")
-        }
-        override fun onFail(errorCode: Int) {}
-        override fun onSuccess() {}
+//Query the fall detection switch
+DHBleSdk.getFallDetect(object : FallDetectCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "fall detect query failed: $errorCode")
     }
-}
+    override fun onResult(data: Int) {
+        Log.e("RWSDK", "FallDetect state: $data (0=off, 1=on)")
+    }
+})
+
+//Enable fall detection
+DHBleSdk.setFallDetect(true, object : FallDetectCallback {
+    override fun onSuccess() {
+        Log.e("RWSDK", "FallDetect enabled")
+    }
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "FallDetect set failed: $errorCode")
+    }
+    override fun onResult(data: Int) = Unit
+})
 ```
-
-
 
 ##### 3.2.1.25 Count Reminder Interval Setting
 
@@ -1501,6 +1490,43 @@ DHBleSdk.preparePasswordReset("5678")
 DHBleSdk.connectDeviceWithModel(bleDevice)
 ```
 
+###### 3.2.1.26.4 Device Identity Authentication
+
+`fun deviceChallenge(challengeHex: String, callback: DeviceChallengeCallback)`
+
+> Configuration table attribute: `isSupportDeviceChallenge`. Only available on devices supporting this capability.
+>
+> Passes the cloud-generated challenge through to the device; the device computes HMAC-SHA256 with the factory-preset key and returns the full response. The SDK only sends the challenge and returns the device response; **business verification of the HMAC result is handled by the app and the cloud**.
+
+Parameter Description:
+
+| Parameter     | Type                   | Description                                                       | Value                                                   |
+| ------------- | ---------------------- | ----------------------------------------------------------------- | ------------------------------------------------------- |
+| challengeHex  | String                 | Random challenge generated by the cloud, hexadecimal string      | 64 characters (=32 bytes), spaces/colons/dashes allowed; invalid format or length fails locally with `onFail` |
+| callback      | DeviceChallengeCallback | Result callback                                                   | The result is returned via onResult(data: String), the response as a hexadecimal string |
+
+Example of usage:
+
+```kotlin
+val challengeCallback = object : DeviceChallengeCallback {
+  override fun onResult(data: String) {
+    //hex string of the 32-byte HMAC-SHA256 response, forward to the cloud for verification
+    Log.e("RWSDK", "device challenge response=$data")
+  }
+
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "device challenge failed: $errorCode")
+  }
+}
+
+//The challenge is generated by the cloud (random bytes as a hex stand-in here)
+val challengeHex = CmdHelper.bytesToHex(ByteArray(32).also { java.util.Random().nextBytes(it) })
+DHBleSdk.deviceChallenge(challengeHex, challengeCallback)
+```
+
 ##### 3.2.1.27 Instant Screen Control
 
 > Configuration-table property: `isSupportScreenControl`. Use this feature only when the device reports support.
@@ -1608,6 +1634,134 @@ DHBleSdk.subscribeData(unitSettingCallback)
 DHBleSdk.getMeasureUnit()
 ```
 
+##### 3.2.1.29 Sedentary Reminder Setting and Getting
+
+> Configuration table attribute: `isSupportSedentary`. Only available on devices supporting this capability.
+>
+> Within the specified period, the device vibrates to remind the user when continuous sedentary time exceeds the reminder interval.
+
+Method Description:
+
+`fun setSedentaryRemind(reminderBean: DrinkReminderBean, callback: ReminderSettingCallback)`
+
+`fun getSedentaryRemind(callback: ReminderSettingCallback)`
+
+> The set result is returned via `onSuccess()`/`onFail()`, and the query result via `onResult(DrinkReminderBean)`.
+
+DrinkReminderBean parameters:
+
+| Parameter               | Type     | Description                    | Value                                                       |
+| ----------------------- | -------- | ------------------------------ | ------------------------------------------------------------ |
+| isOpen                  | Boolean  | Sedentary reminder switch      | true: on; false: off                                         |
+| startHour / startMin    | Int      | Reminder period start          | 0-23 / 0-59                                                  |
+| endHour / endMin        | Int      | Reminder period end            | 0-23 / 0-59                                                  |
+| remindDuration          | Int      | Reminder interval, in minutes  | Time of continuous sedentary time before a reminder triggers  |
+
+Example of usage:
+
+```kotlin
+//Query current configuration
+DHBleSdk.getSedentaryRemind(object : ReminderSettingCallback {
+  override fun onResult(data: DrinkReminderBean?) {
+    Log.e("RWSDK", "sedentary open=${data?.isOpen} " +
+        "${data?.startHour}:${data?.startMin}-${data?.endHour}:${data?.endMin} " +
+        "interval=${data?.remindDuration}min")
+  }
+
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "sedentary query failed: $errorCode")
+  }
+})
+
+//Set: on, 09:00-18:00, 60-minute interval
+DHBleSdk.setSedentaryRemind(DrinkReminderBean().apply {
+  isOpen = true
+  startHour = 9
+  startMin = 0
+  endHour = 18
+  endMin = 0
+  remindDuration = 60
+}, object : ReminderSettingCallback {
+  override fun onResult(data: DrinkReminderBean?) {
+  }
+
+  override fun onSuccess() {
+    Log.e("RWSDK", "sedentary set success")
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "sedentary set failed: $errorCode")
+  }
+})
+```
+
+##### 3.2.1.30 Drinking Reminder Setting and Getting
+
+> Configuration table attribute: `isDrink`. Only available on devices supporting this capability.
+>
+> Within the specified period, the device vibrates periodically at the reminder interval to remind the user to drink water.
+
+Method Description:
+
+`fun setDrinkRemind(reminderBean: DrinkReminderBean, callback: ReminderSettingCallback)`
+
+`fun getDrinkRemind(callback: ReminderSettingCallback)`
+
+> The set result is returned via `onSuccess()`/`onFail()`, and the query result via `onResult(DrinkReminderBean)`.
+
+DrinkReminderBean parameters:
+
+| Parameter               | Type     | Description                    | Value                                                       |
+| ----------------------- | -------- | ------------------------------ | ------------------------------------------------------------ |
+| isOpen                  | Boolean  | Drinking reminder switch       | true: on; false: off                                         |
+| startHour / startMin    | Int      | Reminder period start          | 0-23 / 0-59                                                  |
+| endHour / endMin        | Int      | Reminder period end            | 0-23 / 0-59                                                  |
+| remindDuration          | Int      | Reminder interval, in minutes  | Trigger interval of drinking reminders within the period      |
+
+Example of usage:
+
+```kotlin
+//Query current configuration
+DHBleSdk.getDrinkRemind(object : ReminderSettingCallback {
+  override fun onResult(data: DrinkReminderBean?) {
+    Log.e("RWSDK", "drink open=${data?.isOpen} " +
+        "${data?.startHour}:${data?.startMin}-${data?.endHour}:${data?.endMin} " +
+        "interval=${data?.remindDuration}min")
+  }
+
+  override fun onSuccess() {
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "drink query failed: $errorCode")
+  }
+})
+
+//Set: on, 08:00-22:00, 30-minute interval
+DHBleSdk.setDrinkRemind(DrinkReminderBean().apply {
+  isOpen = true
+  startHour = 8
+  startMin = 0
+  endHour = 22
+  endMin = 0
+  remindDuration = 30
+}, object : ReminderSettingCallback {
+  override fun onResult(data: DrinkReminderBean?) {
+  }
+
+  override fun onSuccess() {
+    Log.e("RWSDK", "drink set success")
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "drink set failed: $errorCode")
+  }
+})
+```
+
 #### 3.2.2 Health Data Synchronization (Real-time Single Measurement and All-day Monitoring)
 
 > There are two ways to detect health data: real-time single measurement and all-day monitoring. Health data includes heart rate, blood oxygen, stress, HRV, sleep, etc. **Sleep data does not have real-time measurement.**
@@ -1620,376 +1774,191 @@ DHBleSdk.getMeasureUnit()
 
 ##### 3.2.2.1 Real-time Detection - Starting and Stopping Device Health Data Detection
 
-> Start health data detection (heart rate, blood oxygen, HRV, stress, blood sugar, etc.);
+> Single measurement of health data (heart rate, blood oxygen, HRV, pressure, blood glucose, blood pressure, temperature);
 >
-> Subscribe to `HealthDataBroCallback` for notification from the device to the app upon test completion;
->
-> Subscribe to `HealthDataControlCallback` for real-time value notifications from the device to the app during testing;
+> Callback `HealthMeasurementCallback`: onStarted (start confirmed) -> onData (real-time values, multiple frames) -> onFinished (measurement end / failure / timeout);
 
 > [!CAUTION]
 >
-> Only one health detection type can be active at a time. You must wait for the current detection to complete (receive the completion callback) or manually stop it before starting a new detection type. Starting multiple types simultaneously will cause detection errors.
+> Only one detection type can run at a time. You must wait for the current detection to finish (onFinished received) or be stopped manually before starting another type. Starting multiple types simultaneously causes detection errors.
 
 Method Description:
 
-`fun controlHealthDataJL(healthType: Byte, testStatus: Byte)`
+`fun controlOpen(type: Int, dataType: Int, callback: HealthMeasurementCallback)`
 
 Parameter Description:
 
-| Parameter  | Type | Description      | Value                                                        |
-| ---------- | ---- | ---------------- | ------------------------------------------------------------ |
-| healthType | Byte | Health data type | Heart Rate: CmdConstants.JL_HR_DATA_TRANSFER_KEY<br>Blood Oxygen: CmdConstants.JL_BO_DATA_TRANSFER_KEY<br>HRV: CmdConstants.JL_HRV_DATA_TRANSFER_KEY<br>Stress: CmdConstants.JL_PRESSURE_DATA_TRANSFER_KEY<br>Blood Sugar: CmdConstants.JL_BLOODSUGAR_DATA_TRANSFER_KEY<br>Blood Pressure: CmdConstants.JL_BP_DATA_TRANSFER_KEY<br>Temperature: CmdConstants.JL_TEMP_DATA_TRANSFER_KEY |
-| testStatus | Byte | Start/Stop       | Start: 1<br>Stop: 0                                          |
+| Parameter | Type                      | Description  | Value                                                            |
+| --------- | ------------------------- | ------------ | ---------------------------------------------------------------- |
+| type      | Int                       | Start/Stop   | 1: start / 0: stop                                               |
+| dataType  | Int                       | Data type    | `HealthDataType.code`, see the type table below                   |
+| callback  | HealthMeasurementCallback | Result callback | onStarted: start confirmed;<br>onData(HealthRealtimeValue): real-time value during measurement;<br>onFinished(HealthMeasurementResult): measurement finished (result.isSuccess) or failed/timed out (result.errorCode) |
+
+HealthDataType description:
+
+| HealthDataType | Item            |
+| -------------- | --------------- |
+| HEART_RATE     | Heart rate      |
+| BLOOD_PRESSURE | Blood pressure  |
+| TEMPERATURE    | Temperature     |
+| BLOOD_OXYGEN   | Blood oxygen    |
+| HRV            | Heart rate variability |
+| STRESS         | Stress          |
+| BLOOD_SUGAR    | Blood glucose   |
 
 Example of usage:
 
 ```kotlin
-// Start heart rate test
-DHBleSdk.subscribeData(healthDataBroCallback) // Monitor real-time health data return
-DHBleSdk.subscribeData(testHrCallback) // Monitor control command results
-DHBleSdk.controlHealthDataJL(CmdConstants.JL_HR_DATA_TRANSFER_KEY, 1)
+//Start heart rate measurement
+DHBleSdk.controlOpen(1, HealthDataType.HEART_RATE.code, object : HealthMeasurementCallback {
+    override fun onStarted() {
+        Log.e("RWSDK", "heart rate measurement started")
+    }
 
-// Stop heart rate test
-DHBleSdk.subscribeData(testHrCallback)
-DHBleSdk.controlHealthDataJL(CmdConstants.JL_HR_DATA_TRANSFER_KEY, 0)
+    override fun onData(data: HealthRealtimeValue) {
+        Log.e("RWSDK", "real-time heart rate: ${data.value}")
+    }
 
-// Monitor real-time value changes during measurement
-private val healthDataBroCallback by lazy {
-  object : HealthDataBroCallback{
-    override fun onResult(data: HealthDataSyncBean?) {
-      data?.let {
-        when (it.dataType) {
-          Constants.RingHealthType.HR -> { //Heart Rate
-            Log.e("RWSDK", "Output: hr Value " + it.hrPartData.last().hr)
-          }
-          ``` Constants.RingHealthType.HRV -> {//HRV 
-            Log.e("RWSDK", "Output: HRV Value " + it.hrPartData.last().hr) 
-          } 
-          Constants.RingHealthType.BLOOD_OXY -> {//Blood Oxygen (blood oxygen) 
-            Log.e("RWSDK", "Output: Blood Oxygen Value " + it.boPartData.last().bo) 
-          } 
-          Constants.RingHealthType.PRESSURE -> {//Pressure Stress 
-            Log.e("RWSDK", "Output: Stress Value " + it.pressurePartData.last().pressure) 
-          } 
-          Constants.RingHealthType.BLOOD_SUGAR -> {//blood sugar BloodSugar 
-            Log.e("RWSDK", "Output: BloodSugar Value " + it.tempPartData.last().temp) 
-          } 
-          Constants.RingHealthType.MUSLIM_COUNT -> { //Msulim Count 
-            Log.e("RWSDK", "Zan Nian Value " + it.muslimCountPartData.count) 
-          } 
-          Constants.RingHealthType.BLOOD_BP -> { //血压 Blood Pressure
-            Log.e("RWSDK", "Blood Pressure Value " + it.bpPartData.last().dp + " " + it.bpPartData.last().sp)
-          }
-          Constants.RingHealthType.TEMPERATURE -> { //体温 Temperature
-            Log.e("RWSDK", "Temperature Value " + it.tempPartData.last().temp / 10.0)
-          }
-          else -> { 
+    override fun onFinished(result: HealthMeasurementResult) {
+        if (result.isSuccess) {
+            Log.e("RWSDK", "measurement finished")
+        } else {
+            Log.e("RWSDK", "measurement failed/timeout: ${result.errorCode}")
+        }
+    }
+})
 
-          } 
-        } 
-      } 
-    } 
-    override fun onFail(errorCode: Int) { 
-
-    } 
-
-    override fun onSuccess() { 
-
-    } 
-
-  }
-}
-
-//Listen to the test completion results
-private val testHrCallback by lazy { 
-  object : HealthDataControlCallback { 
-    override fun onSuccess() { 
-      Log.e("RWSDK", "Output: HealthDataControlCallback Control onSuccess") 
-    } 
-
-    override fun onResult(data: Int?) { 
-      Log.e("RWSDK", "Output: HealthDataControlCallback onResult " + data) 
-      data?.let { 
-        if (data >= 10){ 
-          Log.e("RWSDK", "Output: Measurement completed") 
-        } 
-      } 
-    } 
-
-    override fun onFail(errorCode: Int) { 
-
-    } 
-  }
-}
-
+//Stop heart rate measurement (finishes via onFinished)
+DHBleSdk.controlOpen(0, HealthDataType.HEART_RATE.code, object : HealthMeasurementCallback {
+    override fun onStarted() = Unit
+    override fun onData(data: HealthRealtimeValue) = Unit
+    override fun onFinished(result: HealthMeasurementResult) = Unit
+})
 ```
 
 ##### 3.2.2.2 Continuous monitoring - Set the interval for continuous monitoring of health data.
 
-> Set the monitoring interval for health data (heart rate, blood oxygen, HRV, stress, blood glucose) throughout the day, in minutes.
+> **Note: currently only heart rate supports 30/60-minute intervals; others (blood oxygen, HRV, pressure, blood glucose) only support on/off; the start and end time is fixed to all day and cannot be modified.**
+
+###### Unified Entry (recommended): setHealthMonitor / getHealthMonitor
+
+> Distinguishes all continuous monitoring items (heart rate/blood oxygen/HRV/pressure/blood glucose/blood pressure/temperature/PPG) with a single `HealthMonitorType` parameter;
 >
-> **Note: Currently, only the heart rate interval can be set to 30 minutes or 60 minutes. Other parameters (blood oxygen, HRV, stress, blood glucose) can only be set to on or off; the start and end times are fixed to cover the entire day and cannot be modified.**
-
-###### 3.2.2.2.1 Heart rate detection settings and retrieval
-
-> The interval can only be set to 30 minutes or 60 minutes for heart rate; Subscription callback: `TimedHeartRateCallback`;
-
-Method Description: 
-
-`fun setTimedHeartRateJL(reminderBean: DrinkReminderBean)`
-
-`fun getTimedHeartRateJL()`
-
-Parameter Description:
-
-| Parameter    | Type              | Description | Value                                                        |
-| ------------ | ----------------- | ----------- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | class       | isOpen: true (on) / false (off)<br/>remindDuration: Interval time 30 or 60 minutes<br/>startHour: 0 (fixed, cannot be modified)<br/>startMin: 0 (fixed, cannot be modified)<br/>endHour: 23 (fixed, cannot be modified)<br/>endMin: 59 (fixed, cannot be modified); |
-
-Example of usage:
-
-```kotlin
-// 1. Set HeartRate Monitor(设置心率监听)
-DHBleSdk.subscribeData(hrMonitorCallback)
-val hrMonitorBean = DrinkReminderBean()
-hrMonitorBean.isOpen = true  //Heart rate monitoring switch
-hrMonitorBean.remindDuration = 60 //Heart rate monitoring interval unit is minutes, only 30 minutes and 60 minutes
-hrMonitorBean.startHour = 0 //fixed
-hrMonitorBean.startMin = 0 //fixed
-hrMonitorBean.endHour = 23 //fixed
-hrMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedHeartRateJL(hrMonitorBean)
-
-//1. get HeartRate Monitor
-DHBleSdk.subscribeData(hrMonitorCallback)
-DHBleSdk.getTimedHeartRateJL()
-```
-
-###### 3.2.2.2.2 Blood oxygen monitoring settings and data retrieval
-
-> Interval blood oxygen measurement can only be set to 60 minutes; Subscription callback: `TimedBloodOxygenCallback`;
+> Callback: `ReminderSettingCallback`;
 >
-> Configuration table properties: `isBloodOxy` ;
-
-Method Description: 
-
-`fun setTimedBloodOxygenJL(reminderBean: DrinkReminderBean)`
-
-`fun getTimedBloodOxygenJL()`
-
-Parameter Description:
-
-| Parameter    | Type              | Description | Value                                                        |
-| ------------ | ----------------- | ----------- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | Class       | isOpen: true/false (on/off)<br>remindDuration: Interval time, fixed at 60 minutes<br>startHour: 0 (fixed, cannot be modified)<br>startMin: 0 (fixed, cannot be modified)<br>endHour: 23 (fixed, cannot be modified)<br>endMin: 59 (fixed, cannot be modified); |
-
-Example of usage:
-
-```kotlin
-// 2. Set Blood Oxygen Monitor
-DHBleSdk.subscribeData(timedBloodOxygenCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true  //Blood oxygen monitoring switch
-healthMonitorBean.remindDuration = 60 //fixed 60 minutes
-healthMonitorBean.startHour = 0 //fixed
-healthMonitorBean.startMin = 0 //fixed
-healthMonitorBean.endHour = 23 //fixed
-healthMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedBloodOxygenJL(healthMonitorBean)
-
-//2. Get Blood Oxygen Monitor settings
-DHBleSdk.subscribeData(timedBloodOxygenCallback)
-DHBleSdk.getTimedBloodOxygenJL()
-```
-
-###### 3.2.2.2.3 Heart Rate Variability (HRV) Detection Settings and Retrieval
-
-> The HRV interval can only be set to 60 minutes; Subscription callback: `TimedHrvCallback`;
->
-> Configuration table properties: `isHrv` ;
-
-Method Description: 
-
-`fun setTimedHRVJL(reminderBean: DrinkReminderBean)`
-
-`fun getTimedHRVJL()`
-
-Parameter Description:
-
-| Parameter    | Type              | Description | Value                                                        |
-| ------------ | ----------------- | ----------- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | Class       | isOpen: true/false<br>remindDuration: Interval time, fixed at 60 minutes<br>startHour: 0 (fixed, cannot be modified)<br>startMin: 0 (fixed, cannot be modified)<br>endHour: 23 (fixed, cannot be modified)<br>endMin: 59 (fixed, cannot be modified); |
-
-Example of usage:
-
-```kotlin
-// 3. Set HRV Monitor
-DHBleSdk.subscribeData(hrvDataCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true
-healthMonitorBean.remindDuration = 60 //fixed 60 minutes
-healthMonitorBean.startHour = 0 //fixed
-healthMonitorBean.startMin = 0 //fixed
-healthMonitorBean.endHour = 23 //fixed
-healthMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedHRVJL(healthMonitorBean)
-
-//3. Get HRV Monitor
-DHBleSdk.subscribeData(hrvDataCallback)
-DHBleSdk.getTimedHRVJL()
-```
-
-###### 3.2.2.2.4 Stress Detection Settings and Retrieval
-
-> The interval pressure can only be set to 60 minutes; Subscription callback: `TimedStressCallback`;
->
-> Configuration table properties: `isPressure` ;
-
-Method Description: 
-
-`fun setTimedStressJL(reminderBean: DrinkReminderBean)`
-
-`fun getTimedStressJL()`
-
-Parameter Description:
-
-| Parameter    | Type              | Description | Value                                                        |
-| ------------ | ----------------- | ----------- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | Class       | isOpen: true/false (on/off)<br>remindDuration: fixed interval of 60 minutes<br>startHour: 0 (fixed, cannot be modified)<br>startMin: 0 (fixed, cannot be modified)<br>endHour: 23 (fixed, cannot be modified)<br>endMin: 59 (fixed, cannot be modified); |
-
-Example of usage:
-
-```kotlin
-// 4. Set stress monitoring
-DHBleSdk.subscribeData(stressDataCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true  //Stress monitoring switch
-healthMonitorBean.remindDuration = 60 //fixed 60 minutes
-healthMonitorBean.startHour = 0 //fixed
-healthMonitorBean.startMin = 0 //fixed
-healthMonitorBean.endHour = 23 //fixed
-healthMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedStressJL(healthMonitorBean)
-
-//4. Get stress monitoring
-DHBleSdk.subscribeData(stressDataCallback)
-DHBleSdk.getTimedStressJL()
-```
-
-###### 3.2.2.2.5 Blood Glucose Monitoring Settings and Retrieval
-
-> The blood glucose measurement interval can only be set to 60 minutes; Subscription callback: `TimedBloodSugarCallback`;
->
-> Configuration table properties: `isBloodSugar` ;
-
-Method Description: 
-
-`fun setTimedBloodSugarJL(reminderBean: DrinkReminderBean)`
-
-`fun getTimedBloodSugarJL()`
-
-Parameter Description:
-
-| Parameter    | Type              | Description | Value                                                        |
-| ------------ | ----------------- | ----------- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | Class       | isOpen: true/false<br>remindDuration: Fixed interval of 60 minutes<br>startHour: 0 (fixed, cannot be modified)<br>startMin: 0 (fixed, cannot be modified)<br>endHour: 23 (fixed, cannot be modified)<br>endMin: 59 (fixed, cannot be modified); |
-
-Example of usage:
-
-```kotlin
-// 5. Set blood sugar monitoring
-DHBleSdk.subscribeData(bloodSugarDataCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true  //Blood sugar monitoring switch
-healthMonitorBean.remindDuration = 60 //fixed 60 minutes
-healthMonitorBean.startHour = 0 //fixed
-healthMonitorBean.startMin = 0 //fixed
-healthMonitorBean.endHour = 23 //fixed
-healthMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedBloodSugarJL(healthMonitorBean)
-
-//5. Get blood sugar monitoring
-DHBleSdk.subscribeData(bloodSugarDataCallback)
-DHBleSdk.getTimedBloodSugarJL()
-```
-
-
-###### 3.2.2.2.6 Blood Pressure Monitoring Settings and Retrieval
-
-> The blood pressure measurement interval can only be set to 60 minutes; Subscription callback: `TimedBloodPressureCallback`;
->
-> Configuration table properties: `isBloodPress` ;
-
-Method Description: 
-
-`fun setTimedBloodPressureJL(reminderBean: DrinkReminderBean)`
-
-`fun getTimedBloodPressureJL()`
-
-Parameter Description:
-
-| Parameter    | Type              | Description | Value                                                        |
-| ------------ | ----------------- | ----------- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | Class       | isOpen: true/false<br>remindDuration: Fixed interval of 60 minutes<br>startHour: 0 (fixed, cannot be modified)<br>startMin: 0 (fixed, cannot be modified)<br>endHour: 23 (fixed, cannot be modified)<br>endMin: 59 (fixed, cannot be modified); |
-
-Example of usage:
-
-```kotlin
-// 6. Set blood pressure monitoring
-DHBleSdk.subscribeData(timedBloodPressureCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true  //Blood pressure monitoring switch
-healthMonitorBean.remindDuration = 60 //fixed 60 minutes
-healthMonitorBean.startHour = 0 //fixed
-healthMonitorBean.startMin = 0 //fixed
-healthMonitorBean.endHour = 23 //fixed
-healthMonitorBean.endMin = 59  //fixed
-DHBleSdk.setTimedBloodPressureJL(healthMonitorBean)
-
-//6. Get blood pressure monitoring
-DHBleSdk.subscribeData(timedBloodPressureCallback)
-DHBleSdk.getTimedBloodPressureJL()
-```
-
-
-###### 3.2.2.2.7 Temperature Detection Setting and Getting
-
-> Temperature interval supports 30 or 60 minutes; Subscribe callback: `TimedBodyTemperatureCallback`;
->
-> Configuration table property: `isDataTypeTemperature`;
+> Entity: `HealthMonitorBean`;
 
 Method Description:
 
-`fun setTimedBodyTemperature(reminderBean: DrinkReminderBean)`
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
 
-`fun getTimedBodyTemperature()`
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
+
+Type description:
+
+| HealthMonitorType | Item            | Interval       | Configuration table attribute                    |
+| ----------------- | --------------- | -------------- | ------------------------------------------------ |
+| HEART_RATE        | Heart rate      | 30/60 minutes  | -                                                |
+| BLOOD_OXYGEN      | Blood oxygen    | Fixed 60 min   | isBloodOxy                                       |
+| HRV               | HRV             | Fixed 60 min   | isHrv                                            |
+| STRESS            | Pressure        | Fixed 60 min   | isPressure                                       |
+| BLOOD_SUGAR       | Blood glucose   | Fixed 60 min   | isBloodSugar                                     |
+| BLOOD_PRESSURE    | Blood pressure  | Fixed 60 min   | isBloodPress                                     |
+| BODY_TEMPERATURE  | Temperature     | 30/60 minutes  | isSupportTemperatureMonitoring                   |
+| PPG               | PPG monitoring  | 30/60 minutes  | isSupportPPGMonitoring                           |
 
 Parameter Description:
 
-| Parameter    | Type              | Description | Value                                                        |
-| ------------ | ----------------- | ----------- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | Class       | isOpen: true on/false off<br>remindDuration: interval 30 or 60 minutes<br>startHour: 0 fixed<br>startMin: 0 fixed<br>endHour: 23 fixed<br>endMin: 59 fixed |
+| Parameter    | Type                    | Description | Value                                                           |
+| ------------ | ----------------------- | ----------- | --------------------------------------------------------------- |
+| type         | HealthMonitorType       | Enum        | Monitoring type, see the type table above                       |
+| monitorBean  | HealthMonitorBean       | Entity      | isOpen: true on/false off<br>remindDuration: interval in minutes (see the type table)<br>startHour: 0 fixed<br>startMin: 0 fixed<br>endHour: 23 fixed<br>endMin: 59 fixed; |
+| callback     | ReminderSettingCallback | Interface   | Set result: onSuccess()/onFail();<br>Query result: onResult(DrinkReminderBean); |
 
 Example of usage:
 
 ```kotlin
-// 7. Set temperature monitoring
-DHBleSdk.subscribeData(timedBodyTemperatureCallback)
-val healthMonitorBean = DrinkReminderBean()
-healthMonitorBean.isOpen = true
-healthMonitorBean.remindDuration = 60
-healthMonitorBean.startHour = 0
-healthMonitorBean.startMin = 0
-healthMonitorBean.endHour = 23
-healthMonitorBean.endMin = 59
-DHBleSdk.setTimedBodyTemperature(healthMonitorBean)
+//Unified entry: set heart rate monitoring
+val monitorBean = HealthMonitorBean()
+monitorBean.isOpen = true
+monitorBean.remindDuration = 30 //30-minute interval (heart rate/temperature support 30 or 60, others fixed 60)
+monitorBean.startHour = 0 //fixed
+monitorBean.startMin = 0 //fixed
+monitorBean.endHour = 23 //fixed
+monitorBean.endMin = 59  //fixed
+DHBleSdk.setHealthMonitor(HealthMonitorType.HEART_RATE, monitorBean, object : ReminderSettingCallback {
+    override fun onSuccess() { /* set success */ }
+    override fun onFail(errorCode: Int) { /* set failed */ }
+    override fun onResult(data: DrinkReminderBean?) { /* query result (with getHealthMonitor) */ }
+})
 
-//7. Get temperature monitoring
-DHBleSdk.subscribeData(timedBodyTemperatureCallback)
-DHBleSdk.getTimedBodyTemperature()
+//Unified entry: query blood oxygen monitoring configuration
+DHBleSdk.getHealthMonitor(HealthMonitorType.BLOOD_OXYGEN, object : ReminderSettingCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) { /* query failed */ }
+    override fun onResult(data: DrinkReminderBean?) { /* current configuration */ }
+})
 ```
 
+###### 3.2.2.2.1 Heart Rate Detection Setting and Getting
 
+> Only heart rate supports 30/60-minute intervals;
+>
+> type is fixed `HealthMonitorType.HEART_RATE`
+
+Method Description:
+
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)` — type is fixed `HealthMonitorType.HEART_RATE`
+
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)` — type is fixed `HealthMonitorType.HEART_RATE`
+
+###### 3.2.2.2.2 Blood Oxygen Detection Setting and Getting
+
+> The blood oxygen interval is fixed at 60 minutes;
+>
+> Configuration table attribute: `isBloodOxy` ;
+>
+> type is fixed `HealthMonitorType.BLOOD_OXYGEN`
+
+###### 3.2.2.2.3 Heart Rate Variability (HRV) Detection Setting and Getting
+
+> The HRV interval is fixed at 60 minutes;
+>
+> Configuration table attribute: `isHrv` ;
+>
+> type is fixed `HealthMonitorType.HRV`
+
+###### 3.2.2.2.4 Pressure Detection Setting and Getting
+
+> The pressure interval is fixed at 60 minutes;
+>
+> Configuration table attribute: `isPressure` ;
+>
+> type is fixed `HealthMonitorType.STRESS`
+
+###### 3.2.2.2.5 Blood Glucose Detection Setting and Getting
+
+> The blood glucose interval is fixed at 60 minutes;
+>
+> Configuration table attribute: `isBloodSugar` ;
+>
+> type is fixed `HealthMonitorType.BLOOD_SUGAR`
+
+###### 3.2.2.2.6 Blood Pressure Detection Setting and Getting
+
+> The blood pressure interval is fixed at 60 minutes;
+>
+> Configuration table attribute: `isBloodPress` ;
+>
+> type is fixed `HealthMonitorType.BLOOD_PRESSURE`
+
+###### 3.2.2.2.7 Temperature Detection Setting and Getting
+
+> The temperature interval supports 30 and 60 minutes;
+>
+> Configuration table attribute: `isSupportTemperatureMonitoring`
+>
+> type is fixed `HealthMonitorType.BODY_TEMPERATURE`
 
 ##### 3.2.2.3 All-day Monitoring - Synchronize Health History Data
 
@@ -2497,7 +2466,7 @@ Method Description:
 
 `fun setExerciseMore(type: Int, callback: CustomStatusCallback)`
 
-Use `CustomStatusCallback` for the setting result and `SportDataPushCallback.onResult()` for live workout data. Call `dispose(callback)` after handling the result or when leaving the page.
+The setting result is returned via `CustomStatusCallback`; real-time workout data is received via `SportDataPushCallback.onResult()`. Call `dispose(callback)` after the result is handled or when leaving the page.
 
 Parameter Description:
 
@@ -2512,12 +2481,12 @@ Example of usage:
 DHBleSdk.setExerciseMore(0, object : CustomStatusCallback {
     override fun onSuccess() {
         DHBleSdk.dispose(this)
-        Log.d("SDK", "Workout reporting disabled")
+        Log.e("RWSDK", "Workout reporting disabled")
     }
 
     override fun onFail(errorCode: Int) {
         DHBleSdk.dispose(this)
-        Log.e("SDK", "setExerciseMore failed: $errorCode")
+        Log.e("RWSDK", "setExerciseMore failed: $errorCode")
     }
 })
 ```
@@ -2572,6 +2541,266 @@ private val sportResult3Callback by lazy {
 
 
 
+#### 3.2.5 Recording
+
+> Recording control, status query and recording file management (list/download/delete/format) for smart recording rings;
+>
+> Configuration table attribute: `isSupportRecording`; requires MIC hardware support.
+
+##### 3.2.5.1 Start/Stop Recording
+
+> Control the device to start or stop recording; the device stores the file locally after recording starts.
+>
+> The result is returned via [callback].
+
+Method Description:
+
+`fun recordControl(start: Boolean, callback: RecordControlCallback)`
+
+Parameter Description:
+
+| Parameter | Type                  | Description    | Value                                     |
+| --------- | --------------------- | -------------- | ----------------------------------------- |
+| start     | Boolean               | Boolean        | true: start recording; false: stop recording; |
+| callback  | RecordControlCallback | Result callback | onResult: recording status after the operation (see table below);<br>onFail: failed; |
+
+`RecordControlCallback.onResult` returns the recording status after the operation:
+
+| Value | Description |
+| ----- | ----------- |
+| 0x01  | Recording   |
+| 0x00  | Idle        |
+
+Example of usage:
+
+```kotlin
+DHBleSdk.recordControl(true, object : RecordControlCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "record control failed: $errorCode")
+    }
+    override fun onResult(data: Int) {
+        Log.e("RWSDK", "record control result=$data") //0x01 recording, 0x00 idle; query full status afterwards (3.2.5.2)
+    }
+})
+```
+
+##### 3.2.5.2 Query Recording Status
+
+> Query whether the device is currently recording and the recording storage capacity; it is recommended to query once after the app connects to confirm the device recording status.
+>
+> The result is returned via [callback]'s onResult(RecordStatusBean).
+
+Method Description:
+
+`fun getRecordStatus(callback: RecordStatusCallback)`
+
+Parameter Description:
+
+| Parameter | Type                 | Description     | Value                            |
+| --------- | -------------------- | --------------- | -------------------------------- |
+| callback  | RecordStatusCallback | Result callback | onResult: RecordStatusBean (see table below);<br>onFail: failed; |
+
+RecordStatusBean parameters:
+
+| RecordStatusBean | Type    | Description | Value                                             |
+| ---------------- | ------- | ----------- | ------------------------------------------------- |
+| status           | Int     | Integer     | 0x01: recording; 0x00: idle;                      |
+| recording        | Boolean |             | Whether recording                                  |
+| startTime        | long    |             | Start timestamp of this recording, in seconds (s), only while recording; |
+| duration         | long    |             | Recorded duration, in seconds (s), only while recording; |
+| totalCapacity    | long    |             | Total recording storage capacity, in bytes (B);    |
+| remainingCapacity | long  |             | Remaining recording storage capacity, in bytes (B); |
+
+Example of usage:
+
+```kotlin
+DHBleSdk.getRecordStatus(object : RecordStatusCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "record status failed: $errorCode")
+    }
+    override fun onResult(data: RecordStatusBean) {
+        Log.e("RWSDK", "recording=${data.isRecording} duration=${data.duration}s"
+                + " remaining=${data.remainingCapacity}/${data.totalCapacity}")
+    }
+})
+```
+
+Recording status real-time push: the push type is `DevicePushType.RECORD_STATUS` and `value` is a `RecordStatusBean` (isRecording/status/startTime/duration/capacity). See [3.2.1.21 Device Push Notification](#32121-device-push-notification-ondevicepushlistener) for how to subscribe.
+
+##### 3.2.5.3 Get Recording File List
+
+> Get the metadata of all recording files on the device; the device returns pages, the SDK stitches them automatically, and the complete list is returned once via [callback]'s onResult after everything is received.
+
+Method Description:
+
+`fun getRecordFileList(callback: RecordFileListCallback)`
+
+Parameter Description:
+
+| Parameter | Type                   | Description     | Value                                    |
+| --------- | ---------------------- | --------------- | ---------------------------------------- |
+| callback  | RecordFileListCallback | Result callback | onResult: complete file list (see table below);<br>onFail: failed; |
+
+RecordFileItemBean parameters:
+
+| RecordFileItemBean | Type | Description | Value                                        |
+| ------------------ | ---- | ----------- | ------------------------------------------- |
+| fileId             | long |             | File ID, used for download (3.2.5.4) / delete (3.2.5.5); |
+| fileSize           | long |             | File size, in bytes (B);                    |
+| duration           | long |             | Recording duration, in seconds (s);        |
+| timestamp          | long |             | Recording time in Unix seconds, converted by the SDK; |
+
+Example of usage:
+
+```kotlin
+DHBleSdk.getRecordFileList(object : RecordFileListCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "file list failed: $errorCode")
+    }
+    override fun onResult(data: MutableList<RecordFileItemBean>) {
+        Log.e("RWSDK", "file count=${data.size}")
+        data.forEach {
+            Log.e("RWSDK", "fileId=${it.fileId} size=${it.fileSize} duration=${it.duration}s")
+        }
+    }
+})
+```
+
+##### 3.2.5.4 Download Recording File
+
+> Download a single recording file by file ID; the SDK automatically handles chunked acknowledgement and offset verification, keeps reporting progress during transmission, and `complete=true` means `fileData` holds the complete file data.
+>
+> Progress and the final file data are returned via [callback]'s onResult(RecordFileTransferBean) in multiple frames.
+>
+> **Note:** Transmission is sequential; resume from breakpoint is not supported - on failure the entire file must be downloaded again; repeated calls before completion are rejected with onFail; `fileData` is the raw device OPUS data and must be converted to an Ogg Opus (.opus) file via `OpusBinConverter.convert()` before playback.
+
+Method Description:
+
+`fun transferRecordFile(fileId: Long, callback: RecordFileTransferCallback)`
+
+Parameter Description:
+
+| Parameter | Type                       | Description | Value                                                   |
+| --------- | -------------------------- | ----------- | ------------------------------------------------------- |
+| fileId    | long                       |             | File ID, from the `fileId` returned by `getRecordFileList()`; |
+| callback  | RecordFileTransferCallback | Result callback | onResult: multiple frames (see table below), complete=true is the final frame;<br>onFail: failed/timeout/disconnected; |
+
+RecordFileTransferBean parameters:
+
+| RecordFileTransferBean | Type    | Description | Value                                              |
+| ---------------------- | ------- | ----------- | -------------------------------------------------- |
+| fileType               | Int     | Integer     | 0x01: recording;                                   |
+| duration               | long    |             | Recording duration, in seconds (s);                |
+| timestamp              | long    |             | Recording time in Unix seconds, converted by the SDK;         |
+| fileId                 | long    |             | File ID;                                           |
+| format                 | Int     | Integer     | 0x02: OPUS;                                         |
+| fileSize               | long    |             | Total file size, in bytes (B);                      |
+| received               | long    |             | Received bytes, in bytes (B);                       |
+| progress               | float   |             | Transfer progress 0~1;                              |
+| complete               | Boolean |             | Whether the transfer is complete; true means fileData is the complete file data; |
+| completedAt            | long    |             | Completion timestamp, in seconds (s);               |
+| filePath               | String  |             | App-side save path, assigned by the caller;         |
+| fileData               | byte[]  |             | Complete raw OPUS data when complete=true;          |
+
+Example of usage:
+
+```kotlin
+DHBleSdk.transferRecordFile(fileId, object : RecordFileTransferCallback { //fileId from the file list
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "transfer failed: $errorCode")
+    }
+    override fun onResult(data: RecordFileTransferBean) {
+        val percent = (data.progress * 100).toInt()
+        Log.e("RWSDK", "transfer ${data.received}/${data.fileSize} bytes ($percent%)")
+        if (data.isComplete) {
+            //Convert raw OPUS data to an Ogg Opus file and save
+            val opusBytes = OpusBinConverter.convert(data.fileData ?: ByteArray(0))
+            val file = File(dir, "${data.fileId}_${data.duration}_${data.completedAt}.opus")
+            file.writeBytes(opusBytes)
+        }
+    }
+})
+```
+
+##### 3.2.5.5 Delete Recording File
+
+> Delete a single recording file on the device by file ID.
+>
+> The result is returned via [callback].
+
+Method Description:
+
+`fun deleteRecordFile(fileId: Long, callback: RecordFileDeleteCallback)`
+
+Parameter Description:
+
+| Parameter | Type                     | Description | Value                                                   |
+| --------- | ------------------------ | ----------- | ------------------------------------------------------- |
+| fileId    | long                     |             | File ID, from the `fileId` returned by `getRecordFileList()`; |
+| callback  | RecordFileDeleteCallback | Result callback | onResult: status code (see table below);<br>onFail: failed; |
+
+`RecordFileDeleteCallback.onResult` returns a status code:
+
+| Value | Description |
+| ----- | ----------- |
+| 0x00  | Success     |
+| Other | Failure     |
+
+Example of usage:
+
+```kotlin
+DHBleSdk.deleteRecordFile(fileId, object : RecordFileDeleteCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "delete failed: $errorCode")
+    }
+    override fun onResult(data: Int) {
+        Log.e("RWSDK", "delete result=$data") //0x00 success
+    }
+})
+```
+
+##### 3.2.5.6 Format Recording Storage
+
+> Clear the device recording storage, **deleting all recording files on the device, unrecoverable; confirm twice before calling.**
+>
+> The result is returned via [callback].
+
+Method Description:
+
+`fun formatRecordStorage(callback: RecordFormatCallback)`
+
+Parameter Description:
+
+| Parameter | Type                  | Description     | Value                            |
+| --------- | --------------------- | --------------- | -------------------------------- |
+| callback  | RecordFormatCallback  | Result callback | onResult: status code (see table below);<br>onFail: failed; |
+
+`RecordFormatCallback.onResult` returns a status code:
+
+| Value | Description |
+| ----- | ----------- |
+| 0x00  | Success     |
+| Other | Failure     |
+
+Example of usage:
+
+```kotlin
+DHBleSdk.formatRecordStorage(object : RecordFormatCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) {
+        Log.e("RWSDK", "format failed: $errorCode")
+    }
+    override fun onResult(data: Int) {
+        Log.e("RWSDK", "format result=$data") //0x00 success
+    }
+})
+```
+
 #### 5.2.5 Sensor Raw Data
 
 This section covers two different data retrieval methods:
@@ -2612,41 +2841,48 @@ Valid `sensorType` combinations for PPG/ACC/PPG Red/IR historical collection:
 
 > PPG timed monitoring setting, similar to heart rate/HRV timed monitoring;
 >
-> Configuration table property: `isSupportPPGMonitoring`
+> Configuration table attribute: `isSupportPPGMonitoring`
 >
-> Subscribe to `TimedPPGCallback` to get the result.
+> The result is returned via `ReminderSettingCallback`.
 
 Method Description:
 
-`fun setTimedPPGJL(reminderBean: DrinkReminderBean)`
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)` — type is fixed `HealthMonitorType.PPG`
 
-`fun getTimedPPGJL()`
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)` — type is fixed `HealthMonitorType.PPG`
 
 Parameter Description:
 
-| Parameter    | Type              | Description | Value                                                        |
-| ------------ | ----------------- | ----------- | ------------------------------------------------------------ |
-| reminderBean | DrinkReminderBean | Class       | isOpen: true on/false off<br>remindDuration: default 30 minutes<br>startHour: 0 fixed<br>startMin: 0 fixed<br>endHour: 23 fixed<br>endMin: 59 fixed |
+| Parameter    | Type                    | Description | Value                                                           |
+| ------------ | ----------------------- | ----------- | --------------------------------------------------------------- |
+| type         | HealthMonitorType       | Enum        | Fixed `HealthMonitorType.PPG`                                   |
+| monitorBean  | HealthMonitorBean       | Entity      | isOpen: true on/false off<br>remindDuration: default interval 30 minutes<br>startHour: 0 fixed<br>startMin: 0 fixed<br>endHour: 23 fixed<br>endMin: 59 fixed |
+| callback     | ReminderSettingCallback | Interface   | Set result: onSuccess()/onFail();<br>Query result: onResult(DrinkReminderBean); |
 
 Example of usage:
 
 ```kotlin
 //Set PPG monitoring
-DHBleSdk.subscribeData(ppgDataCallback)
-val healthMonitorBean = DrinkReminderBean()
+val healthMonitorBean = HealthMonitorBean()
 healthMonitorBean.isOpen = true
 healthMonitorBean.remindDuration = 60
 healthMonitorBean.startHour = 0
 healthMonitorBean.startMin = 0
 healthMonitorBean.endHour = 23
 healthMonitorBean.endMin = 59
-DHBleSdk.setTimedPPGJL(healthMonitorBean)
+DHBleSdk.setHealthMonitor(HealthMonitorType.PPG, healthMonitorBean, object : ReminderSettingCallback {
+    override fun onSuccess() { /* set success */ }
+    override fun onFail(errorCode: Int) { /* set failed */ }
+    override fun onResult(data: DrinkReminderBean?) { /* query result (with getHealthMonitor) */ }
+})
 
-//Get PPG monitoring
-DHBleSdk.subscribeData(ppgDataCallback)
-DHBleSdk.getTimedPPGJL()
+//Get PPG monitoring configuration
+DHBleSdk.getHealthMonitor(HealthMonitorType.PPG, object : ReminderSettingCallback {
+    override fun onSuccess() = Unit
+    override fun onFail(errorCode: Int) { /* query failed */ }
+    override fun onResult(data: DrinkReminderBean?) { /* current PPG monitoring configuration */ }
+})
 ```
-
 
 ##### 5.2.5.1 Start and Stop Sensor Raw Data
 
@@ -2803,3 +3039,34 @@ fun unregisterSleepRawDataCallback() {
     DHBleSdk.dispose(sleepRawDataCallback)
 }
 ```
+
+## SDK Revision History
+
+**V2.0.0_20260922** (2026.09.22)
+
+- Added recording interfaces (3.2.5); added `isSupportRecording` to the function configuration table.
+- Added device identity authentication interface (3.2.1.26.4); added `isSupportDeviceChallenge` to the function configuration table.
+- Added sedentary reminder setting and getting interface (3.2.1.29); added `isSupportSedentary` to the function configuration table.
+- Added drinking reminder setting and getting interface (3.2.1.30); added `isDrink` to the function configuration table.
+- Added unified continuous monitoring setting interface `setHealthMonitor`/`getHealthMonitor` (3.2.2.2, by `HealthMonitorType`) and the single real-time detection interface `controlOpen` (3.2.2.1, session-style callback); old interfaces remain available.
+
+**V2.0.0_20260909** (2026.09.09)
+
+- Added metric/imperial unit settings and retrieval (3.2.1.28).
+- Added charging status and real-time battery monitoring (3.2.1.4).
+- Lowered the minimum supported Android version to Android 7.0 (API 24).
+
+**V2.0.0_20260820** (2026.08.20)
+
+- Added the `setDeviceTime` custom device-time API for debugging and testing.
+- Added authorized password reset support (3.2.1.26.3).
+
+**V2.0.0_20260817** (2026.08.17)
+
+- Added instant screen control (3.2.1.27).
+- Fixed alarm retrieval so that `onResult` returns an empty list when the device has no alarms.
+- Added the available-firmware endpoint and OTA device-model/version validation guidance (3.2.3.1).
+
+**V2.0.0_20260724** (2026.07.24)
+
+- Added support for step-detail intervals.

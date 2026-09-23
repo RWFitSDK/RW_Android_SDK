@@ -21,6 +21,7 @@ import com.dhouse.dhsdk_v2.ui.adapter.DeviceSettingAdapter
 import com.example.blesdk.DHBleSdk
 import com.example.blesdk.bean.function.*
 import com.example.blesdk.callback.data.*
+import com.example.blesdk.blering.HealthMonitorType
 import com.example.blesdk.callback.status.CustomStatusCallback
 import com.example.blesdk.utils.Constants
 
@@ -249,9 +250,11 @@ class DeviceFragment : Fragment() {
                     override fun onSuccess() = settingSuccess(this, item.id, getString(if (index == 1) R.string.demo_enabled else R.string.demo_disabled))
                     override fun onFail(errorCode: Int) = settingFail(this, errorCode)
                 }
-                DHBleSdk.subscribeData(callback)
-                DHBleSdk.setFallDetect(index == 1)
+                DHBleSdk.setFallDetect(index == 1, callback)
             }
+            "sedentary" -> editSedentary(item.id)
+            "drink_reminder" -> editDrinkRemind(item.id)
+            "device_challenge" -> runDeviceChallenge(item.id)
             "hr_alert" -> editHeartRateAlert(item.id)
             "bo_alert" -> editBloodOxygenAlert(item.id)
             "vibration_count" -> editVibration(item.id)
@@ -474,9 +477,6 @@ class DeviceFragment : Fragment() {
             .setMessage(R.string.demo_ota_demo_message)
             .setPositiveButton(R.string.demo_confirm, null)
             .show()
-
-        // Select a valid firmware path before calling:
-        // DHBleSdk.ringOtaWithFileData(filePath, callback)
     }
 
     private fun showAlarmActions() {
@@ -681,82 +681,31 @@ class DeviceFragment : Fragment() {
     }
 
     private fun setMonitor(id: String, selected: Int) {
+        val type = when (id) {
+            "monitor_hr" -> HealthMonitorType.HEART_RATE
+            "monitor_bo" -> HealthMonitorType.BLOOD_OXYGEN
+            "monitor_hrv" -> HealthMonitorType.HRV
+            "monitor_pressure" -> HealthMonitorType.STRESS
+            "monitor_bp" -> HealthMonitorType.BLOOD_PRESSURE
+            "monitor_sugar" -> HealthMonitorType.BLOOD_SUGAR
+            "monitor_temp" -> HealthMonitorType.BODY_TEMPERATURE
+            "monitor_ppg" -> HealthMonitorType.PPG
+            else -> return
+        }
         val interval = if (selected == 1) 30 else 60
         val valueText = if (selected == 0) getString(R.string.demo_disabled) else getString(R.string.demo_every_minutes, interval)
-        val bean = DrinkReminderBean().apply {
+        DHBleSdk.setHealthMonitor(type, HealthMonitorBean().apply {
             isOpen = selected > 0
             remindDuration = interval
             startHour = 0
             startMin = 0
             endHour = 23
             endMin = 59
-        }
-        when (id) {
-            "monitor_hr" -> {
-                val callback = object : TimedHeartRateCallback {
-                    override fun onResult(data: DrinkReminderBean?) = Unit
-                    override fun onSuccess() { settingSuccess(this, id, valueText) }
-                    override fun onFail(errorCode: Int) { settingFail(this, errorCode) }
-                }
-                DHBleSdk.subscribeData(callback); DHBleSdk.setTimedHeartRateJL(bean)
-            }
-            "monitor_bo" -> {
-                val callback = object : TimedBloodOxygenCallback {
-                    override fun onResult(data: DrinkReminderBean?) = Unit
-                    override fun onSuccess() { settingSuccess(this, id, valueText) }
-                    override fun onFail(errorCode: Int) { settingFail(this, errorCode) }
-                }
-                DHBleSdk.subscribeData(callback); DHBleSdk.setTimedBloodOxygenJL(bean)
-            }
-            "monitor_hrv" -> {
-                val callback = object : TimedHrvCallback {
-                    override fun onResult(data: DrinkReminderBean?) = Unit
-                    override fun onSuccess() { settingSuccess(this, id, valueText) }
-                    override fun onFail(errorCode: Int) { settingFail(this, errorCode) }
-                }
-                DHBleSdk.subscribeData(callback); DHBleSdk.setTimedHRVJL(bean)
-            }
-            "monitor_pressure" -> {
-                val callback = object : TimedStressCallback {
-                    override fun onResult(data: DrinkReminderBean?) = Unit
-                    override fun onSuccess() { settingSuccess(this, id, valueText) }
-                    override fun onFail(errorCode: Int) { settingFail(this, errorCode) }
-                }
-                DHBleSdk.subscribeData(callback); DHBleSdk.setTimedStressJL(bean)
-            }
-            "monitor_bp" -> {
-                val callback = object : TimedBloodPressureCallback {
-                    override fun onResult(data: DrinkReminderBean?) = Unit
-                    override fun onSuccess() { settingSuccess(this, id, valueText) }
-                    override fun onFail(errorCode: Int) { settingFail(this, errorCode) }
-                }
-                DHBleSdk.subscribeData(callback); DHBleSdk.setTimedBloodPressureJL(bean)
-            }
-            "monitor_sugar" -> {
-                val callback = object : TimedBloodSugarCallback {
-                    override fun onResult(data: DrinkReminderBean?) = Unit
-                    override fun onSuccess() { settingSuccess(this, id, valueText) }
-                    override fun onFail(errorCode: Int) { settingFail(this, errorCode) }
-                }
-                DHBleSdk.subscribeData(callback); DHBleSdk.setTimedBloodSugarJL(bean)
-            }
-            "monitor_temp" -> {
-                val callback = object : TimedBodyTemperatureCallback {
-                    override fun onResult(data: DrinkReminderBean?) = Unit
-                    override fun onSuccess() { settingSuccess(this, id, valueText) }
-                    override fun onFail(errorCode: Int) { settingFail(this, errorCode) }
-                }
-                DHBleSdk.subscribeData(callback); DHBleSdk.setTimedBodyTemperature(bean)
-            }
-            "monitor_ppg" -> {
-                val callback = object : TimedPPGCallback {
-                    override fun onResult(data: DrinkReminderBean?) = Unit
-                    override fun onSuccess() { settingSuccess(this, id, valueText) }
-                    override fun onFail(errorCode: Int) { settingFail(this, errorCode) }
-                }
-                DHBleSdk.subscribeData(callback); DHBleSdk.setTimedPPGJL(bean)
-            }
-        }
+        }, object : ReminderSettingCallback {
+            override fun onResult(data: DrinkReminderBean?) = Unit
+            override fun onSuccess() { settingSuccess(this, id, valueText) }
+            override fun onFail(errorCode: Int) { settingFail(this, errorCode) }
+        })
     }
 
     private fun resetPassword() {
@@ -783,10 +732,16 @@ class DeviceFragment : Fragment() {
         }
     }
 
-    private fun choose(title: String, labels: Array<String>, action: (Int) -> Unit) {
+    private fun choose(title: String, labels: Array<String>, action: (Int) -> Unit) =
+        choose(title, labels, -1, action)
+
+    private fun choose(title: String, labels: Array<String>, presetIndex: Int, action: (Int) -> Unit) {
         AlertDialog.Builder(requireContext())
             .setTitle(title)
-            .setItems(labels) { _, which -> action(which) }
+            .setSingleChoiceItems(labels, presetIndex.takeIf { it >= 0 } ?: 0) { dialog, which ->
+                dialog.dismiss()
+                action(which)
+            }
             .show()
     }
 
@@ -845,6 +800,92 @@ class DeviceFragment : Fragment() {
         if (callback is com.example.blesdk.blering.BaseDataCallback<*>) DHBleSdk.dispose(callback)
     }
 
+    /** 久坐提醒: 先查当前配置,再依次编辑间隔与时段(开关+起止时间)。单槽回调,无需 dispose */
+    private fun editSedentary(settingId: String) {
+        DHBleSdk.getSedentaryRemind(object : ReminderSettingCallback {
+            override fun onSuccess() = Unit
+            override fun onFail(errorCode: Int) = Unit
+            override fun onResult(data: DrinkReminderBean?) {
+                if (!isAdded) return
+                chooseIntervalThenTimeRange(settingId, data?.remindDuration ?: 60,
+                    data?.startHour ?: 9, data?.startMin ?: 0,
+                    data?.endHour ?: 18, data?.endMin ?: 0,
+                    getString(R.string.demo_sedentary), getString(R.string.demo_sedentary_interval)) { bean, cb ->
+                    DHBleSdk.setSedentaryRemind(bean, cb)
+                }
+            }
+        })
+    }
+
+    /** 喝水提醒: 先查当前配置,再依次编辑间隔与时段(开关+起止时间)。单槽回调,无需 dispose */
+    private fun editDrinkRemind(settingId: String) {
+        DHBleSdk.getDrinkRemind(object : ReminderSettingCallback {
+            override fun onSuccess() = Unit
+            override fun onFail(errorCode: Int) = Unit
+            override fun onResult(data: DrinkReminderBean?) {
+                if (!isAdded) return
+                chooseIntervalThenTimeRange(settingId, data?.remindDuration ?: 30,
+                    data?.startHour ?: 8, data?.startMin ?: 0,
+                    data?.endHour ?: 22, data?.endMin ?: 0,
+                    getString(R.string.demo_drink_reminder), getString(R.string.demo_drink_reminder_interval)) { bean, cb ->
+                    DHBleSdk.setDrinkRemind(bean, cb)
+                }
+            }
+        })
+    }
+
+    private fun chooseIntervalThenTimeRange(
+        settingId: String, duration: Int, sH: Int, sM: Int, eH: Int, eM: Int,
+        title: String, intervalTitle: String,
+        send: (DrinkReminderBean, ReminderSettingCallback) -> Unit
+    ) {
+        val intervals = intArrayOf(15, 30, 45, 60, 90, 120)
+        val labels = intervals.map { getString(R.string.demo_minutes_value, it) }.toTypedArray()
+        val presetIndex = intervals.indexOf(duration).takeIf { it >= 0 } ?: 3
+        choose(intervalTitle, labels, presetIndex) { intervalIndex ->
+            val interval = intervals[intervalIndex]
+            editTimeRange(title, sH, sM, eH, eM) { enabled, sh, sm, eh, em ->
+                send(DrinkReminderBean().apply {
+                    isOpen = enabled
+                    startHour = sh
+                    startMin = sm
+                    endHour = eh
+                    endMin = em
+                    remindDuration = interval
+                }, object : ReminderSettingCallback {
+                    override fun onResult(data: DrinkReminderBean?) = Unit
+                    override fun onSuccess() = settingSuccess(this, settingId,
+                        if (enabled) "${timeRangeText(sh, sm, eh, em)} / ${getString(R.string.demo_minutes_value, interval)}" else getString(R.string.demo_disabled))
+                    override fun onFail(errorCode: Int) = settingFail(this, errorCode)
+                })
+            }
+        }
+    }
+
+    /** 设备身份认证: 发送challenge(hex字符串输入),展示设备返回的HMAC response(hex输出)。challenge为固定值,调试时手动修改。 */
+    private fun runDeviceChallenge(settingId: String) {
+        val challengeHex = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+        val callback = object : DeviceChallengeCallback {
+            override fun onSuccess() = Unit
+            override fun onFail(errorCode: Int) {
+                if (!isAdded) return
+                settingFail(this, errorCode)
+            }
+            override fun onResult(data: String?) {
+                if (!isAdded) return
+                val responseHex = data ?: "-"
+                settingValues[settingId] = responseHex.take(16) + "…"
+                render(DemoStateStore.state)
+                AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.demo_device_challenge)
+                    .setMessage("challenge:\n$challengeHex\n\nresponse:\n$responseHex")
+                    .setPositiveButton(R.string.demo_confirm, null)
+                    .show()
+            }
+        }
+        DHBleSdk.deviceChallenge(challengeHex, callback)
+    }
+
     private fun toast(message: String) {
         if (isAdded) Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }
@@ -854,6 +895,6 @@ class DeviceFragment : Fragment() {
     companion object {
         private const val SENSOR_RAW_START = 1
         private const val SENSOR_RAW_STOP = 2
-        private const val SENSOR_TYPE_PPG_ACC = 3
+        private const val SENSOR_TYPE_PPG_ACC = 2
     }
 }

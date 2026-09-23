@@ -18,6 +18,7 @@ import com.dhouse.dhsdk_v2.demo.DemoStateStore
 import com.dhouse.dhsdk_v2.demo.DemoUiState
 import com.dhouse.dhsdk_v2.ui.ScanActivity
 import com.dhouse.dhsdk_v2.ui.Workout.WorkoutTypeActivity
+import com.dhouse.dhsdk_v2.ui.Recording.RecordingActivity
 import com.dhouse.dhsdk_v2.ui.adapter.HealthCellAdapter
 import com.dhouse.dhsdk_v2.ui.adapter.HealthCellModel
 import com.dhouse.dhsdk_v2.ui.health.HealthDetailActivity
@@ -31,6 +32,12 @@ class HomeFragment : Fragment() {
         if (type == DemoHealthType.WORKOUT) {
             if (DemoStateStore.state.ready) {
                 startActivity(Intent(requireContext(), WorkoutTypeActivity::class.java))
+            } else {
+                Toast.makeText(requireContext(), R.string.demo_connect_first, Toast.LENGTH_SHORT).show()
+            }
+        } else if (type == DemoHealthType.RECORDING) {
+            if (DemoStateStore.state.ready) {
+                startActivity(Intent(requireContext(), RecordingActivity::class.java))
             } else {
                 Toast.makeText(requireContext(), R.string.demo_connect_first, Toast.LENGTH_SHORT).show()
             }
