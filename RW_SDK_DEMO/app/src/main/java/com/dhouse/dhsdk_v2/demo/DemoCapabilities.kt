@@ -41,6 +41,7 @@ fun buildDeviceSettings(context: Context, menu: SupportMenuBean?): List<DemoSett
     add(menu.isSupportHrReminder, "hr_alert", R.string.demo_hr_alert, R.string.demo_hr_alert_desc)
     add(menu.isSupportBoReminder, "bo_alert", R.string.demo_bo_alert, R.string.demo_bo_alert_desc)
     add(menu.isSupportMotoVibrationLevel, "vibration_count", R.string.demo_vibration_parameters, R.string.demo_vibration_parameters_desc)
+    add(menu.isSupportVibrationControl, "vibration_control", R.string.demo_vibration_control, R.string.demo_vibration_control_desc)
     add(menu.isSupportAlarmVibrationDuration, "alarm_vibration", R.string.demo_alarm_vibration_count, R.string.demo_alarm_vibration_count_desc)
     add(menu.isSupportVibrationInterval, "vibration_interval", R.string.demo_vibration_interval, R.string.demo_vibration_interval_desc)
     add(menu.isSupportCountReminder, "count_reminder", R.string.demo_count_reminder, R.string.demo_count_reminder_desc)

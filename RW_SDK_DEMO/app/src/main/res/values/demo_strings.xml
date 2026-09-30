@@ -243,4 +243,12 @@
 
     <string name="demo_ble_cache_error">Bluetooth cache error. Turn Bluetooth off and on, then try again.</string>
     <string name="demo_connection_failed">Connection failed. Please try again.</string>
+    <string name="demo_read_rssi">Read RSSI</string>
+    <string name="demo_rssi_failed">RSSI read failed: %1$d</string>
+    <string name="demo_vibration_control">Vibration control</string>
+    <string name="demo_vibration_control_desc">Single round / Continuous / Loop / Stop</string>
+    <string name="demo_vibration_once">Single round: 3 medium pulses</string>
+    <string name="demo_vibration_continuous">Continuous: medium strength</string>
+    <string name="demo_vibration_loop">Loop: 3 medium pulses, 2/s, 1 s pause</string>
+    <string name="demo_vibration_stop">Stop vibration</string>
 </resources>

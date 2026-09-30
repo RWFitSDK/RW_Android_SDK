@@ -185,6 +185,7 @@ interface RingConnectBleCallback {
 
 > After calling this method, wait for `onRingConnectFailed` before reconnecting or binding another device, so the current connection and related resources can be fully released.
 
+
 ##### 3.1.5 Local binding and automatic reconnection, unbinding
 
 >  [!IMPORTANT]
@@ -248,7 +249,32 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportDevicePasswordAuth | Does it support device password authentication?              |
 | isSupportScreenControl      | Does it support instant screen on/off control?                |
 | isSupportUnitSetting        | Does it support metric/imperial unit settings?                |
+| isSupportVibrationControl | Supports custom vibration control |
 
+
+##### 3.1.7 Read connected RSSI
+
+`DHBleSdk.readRssi(callback: RssiCallback)` returns signal strength in dBm through `onRssiRead(rssi: Int)`, or an error through `onRssiFailed(errorCode: Int)`. One-shot callbacks run on the main thread; no subscription or `dispose()` is required.
+
+| Error constant in RssiCallback | Meaning |
+| --- | --- |
+| `ERROR_NOT_CONNECTED` (-1) | Not connected or disconnected |
+| `ERROR_BUSY` (-2) | RSSI request pending or OTA active |
+| `ERROR_START_FAILED` (-3) | System refused to start reading |
+| `ERROR_TIMEOUT` (-4) | No result within 5 seconds of starting |
+| Other nonzero values | Android GATT failure status |
+
+```kotlin
+DHBleSdk.readRssi(object : RssiCallback {
+    override fun onRssiRead(rssi: Int) {
+        // Update signal strength in dBm
+    }
+
+    override fun onRssiFailed(errorCode: Int) {
+        // Handle failure; skip this reading on ERROR_BUSY
+    }
+})
+```
 
 ### 3.2 Device function operation
 
@@ -1762,6 +1788,38 @@ DHBleSdk.setDrinkRemind(DrinkReminderBean().apply {
 })
 ```
 
+##### 3.2.1.31 Custom vibration control
+
+Requires `SupportMenuBean.isSupportVibrationControl`.
+
+```kotlin
+fun controlVibration(mode: Int, strength: Int, groupCount: Int,
+                     frequency: Int, pause: Int, callback: CustomStatusCallback)
+```
+
+| Parameter | Description |
+| --- | --- |
+| mode | 1–15: vibrate N times; 255: continuous or repeating groups |
+| strength | 0: stop; 1: weak; 2: medium; 3: strong |
+| groupCount | Pulses per group, 1–15; 0 when not using grouped repetition |
+| frequency | Pulses per second, 1–10; 0 when not using grouped repetition |
+| pause | Pause between groups, 1–255 in 100 ms units; 0 otherwise |
+| callback | onSuccess() / onFail(errorCode); automatically released, no subscribe/dispose |
+
+Use zero for all three group parameters in single-round or continuous mode. Grouped repetition requires mode=255 and all three group parameters. Set strength=0 to stop (group parameters are ignored). Invalid parameters throw IllegalArgumentException. Wait for the previous result before issuing another request.
+
+```kotlin
+val callback = object : CustomStatusCallback {
+    override fun onSuccess() {}
+    override fun onFail(errorCode: Int) {}
+}
+DHBleSdk.controlVibration(3, 2, 0, 0, 0, callback) // Three medium pulses
+// Other alternatives (call separately):
+// controlVibration(255, 2, 0, 0, 0, callback) // Continuous
+// controlVibration(255, 2, 3, 2, 10, callback) // Repeating groups, 1 s pause
+// controlVibration(255, 0, 0, 0, 0, callback) // Stop
+```
+
 #### 3.2.2 Health Data Synchronization (Real-time Single Measurement and All-day Monitoring)
 
 > There are two ways to detect health data: real-time single measurement and all-day monitoring. Health data includes heart rate, blood oxygen, stress, HRV, sleep, etc. **Sleep data does not have real-time measurement.**
@@ -3041,6 +3099,11 @@ fun unregisterSleepRawDataCallback() {
 ```
 
 ## SDK Revision History
+
+**V2.0.0_20260930** (2026.09.30)
+
+- Added connected RSSI reading interface `readRssi` (3.1.7).
+- Added custom vibration control interface `controlVibration` (3.2.1.31); added `isSupportVibrationControl` to the function configuration table.
 
 **V2.0.0_20260922** (2026.09.22)
 

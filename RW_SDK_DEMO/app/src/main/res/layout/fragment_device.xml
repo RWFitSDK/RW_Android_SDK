@@ -124,6 +124,13 @@
                     android:textStyle="bold" />
 
                 <Button
+                    android:id="@+id/read_rssi"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:text="@string/demo_read_rssi"
+                    android:textAllCaps="false" />
+
+                <Button
                     android:id="@+id/refresh_device_info"
                     android:layout_width="wrap_content"
                     android:layout_height="40dp"

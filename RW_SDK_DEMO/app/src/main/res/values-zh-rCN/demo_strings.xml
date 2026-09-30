@@ -84,4 +84,12 @@
     <string name="demo_alarm_management">闹钟管理</string><string name="demo_set_alarm">设置闹钟</string><string name="demo_get_all_alarms">获取全部闹钟</string><string name="demo_delete_all_alarms">删除全部闹钟</string><string name="demo_repeat_schedule">重复方式</string><string name="demo_once">仅一次</string><string name="demo_every_day">每天</string><string name="demo_weekdays">工作日</string><string name="demo_weekends">周末</string><string name="demo_no_alarms">设备中暂无闹钟</string><string name="demo_all_alarms">全部闹钟（%1$d）</string><string name="demo_delete_all_alarms_message">确定删除设备中的全部闹钟？</string><string name="demo_alarm_item">%1$d. %2$s · %3$s · %4$s</string>
     <string-array name="demo_weekday_names"><item>周日</item><item>周一</item><item>周二</item><item>周三</item><item>周四</item><item>周五</item><item>周六</item></string-array>
     <string name="demo_ble_cache_error">蓝牙缓存异常，请关闭并重新打开手机蓝牙后重试</string><string name="demo_connection_failed">连接失败，请重试</string>
+    <string name="demo_read_rssi">读取 RSSI</string>
+    <string name="demo_rssi_failed">RSSI 读取失败：%1$d</string>
+    <string name="demo_vibration_control">自定义震动控制</string>
+    <string name="demo_vibration_control_desc">单轮 / 持续 / 循环 / 停止</string>
+    <string name="demo_vibration_once">单轮：中强度震动3次</string>
+    <string name="demo_vibration_continuous">持续：中强度震动</string>
+    <string name="demo_vibration_loop">循环：每组3次，中强度，2次/秒，停顿1秒</string>
+    <string name="demo_vibration_stop">停止震动</string>
 </resources>

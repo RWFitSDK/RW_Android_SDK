@@ -20,10 +20,13 @@ import com.dhouse.dhsdk_v2.ui.ScanActivity
 import com.dhouse.dhsdk_v2.ui.adapter.DeviceSettingAdapter
 import com.example.blesdk.DHBleSdk
 import com.example.blesdk.bean.function.*
+import com.example.blesdk.callback.OnFileTransferCallback
 import com.example.blesdk.callback.data.*
 import com.example.blesdk.blering.HealthMonitorType
 import com.example.blesdk.callback.status.CustomStatusCallback
 import com.example.blesdk.utils.Constants
+import java.io.File
+import java.util.zip.ZipInputStream
 
 class DeviceFragment : Fragment() {
     private var _binding: FragmentDeviceBinding? = null
@@ -73,6 +76,16 @@ class DeviceFragment : Fragment() {
         binding.reconnectDevice.setOnClickListener { DemoStateStore.reconnect() }
         binding.disconnectDevice.setOnClickListener { DemoStateStore.disconnect() }
         binding.refreshDeviceInfo.setOnClickListener { DemoStateStore.refreshDeviceInfo() }
+        binding.readRssi.setOnClickListener {
+            DHBleSdk.readRssi(object : com.example.blesdk.callback.RssiCallback {
+                override fun onRssiRead(rssi: Int) {
+                    if (_binding != null && isAdded) toast("RSSI: $rssi dBm")
+                }
+                override fun onRssiFailed(errorCode: Int) {
+                    if (_binding != null && isAdded) toast(getString(R.string.demo_rssi_failed, errorCode))
+                }
+            })
+        }
         DHBleSdk.subscribeData(sensorRawControlCallback)
         removeObserver = DemoStateStore.observe(::render)
     }
@@ -104,6 +117,7 @@ class DeviceFragment : Fragment() {
         binding.reconnectDevice.isEnabled = !state.connecting
         binding.disconnectDevice.visibility = if (device != null && state.connected) View.VISIBLE else View.GONE
         binding.refreshDeviceInfo.isEnabled = state.ready
+        binding.readRssi.isEnabled = state.ready
         binding.searchDevice.text = getString(if (device == null) R.string.demo_search_device else R.string.demo_unbind_device)
         val settings = buildDeviceSettings(requireContext(), state.supportMenu).map { item ->
             settingValues[item.id]?.let { item.copy(valueText = it) } ?: item
@@ -258,6 +272,7 @@ class DeviceFragment : Fragment() {
             "hr_alert" -> editHeartRateAlert(item.id)
             "bo_alert" -> editBloodOxygenAlert(item.id)
             "vibration_count" -> editVibration(item.id)
+            "vibration_control" -> showVibrationControl()
             "alarm_vibration" -> showNumberPicker(getString(R.string.demo_alarm_vibration_count), 0, 6, 2, getString(R.string.demo_count_value, 1).replace("1", "").trim()) { count ->
                 val callback = object : AlarmVibrationDurationCallback {
                     override fun onResult(data: Int?) = Unit
@@ -472,11 +487,79 @@ class DeviceFragment : Fragment() {
     }
 
     private fun showOtaIntegrationInfo() {
-        AlertDialog.Builder(requireContext())
+        val packages = arrayOf(
+            "YCLY02_2.3.1_2.fot",
+            "YCLY02_2.3.2_2.fot",
+            "sy19_v1.1.8.zip",
+            "sy19_v1.1.9.zip",
+            "dfu_application.zip"
+        )
+        choose(getString(R.string.demo_ota_select_package), packages) { index ->
+            startOtaUpgrade(packages[index])
+        }
+    }
+
+    /** 从 assets 拷出固件包并发起 OTA；进度与结果经 OnFileTransferCallback 回传。 */
+    private fun startOtaUpgrade(assetName: String) {
+        val cacheFile = File(requireContext().cacheDir, "ota_$assetName")
+        try {
+            requireContext().assets.open("ota/$assetName").use { input ->
+                cacheFile.outputStream().use { output -> input.copyTo(output) }
+            }
+        } catch (e: Exception) {
+            toast(getString(R.string.demo_ota_copy_failed, e.message ?: ""))
+            return
+        }
+        // Nordic DFU 包是 zip（signed.bin + manifest.json），解出 bin 后再交给 SDK
+        val otaFile = if (assetName.endsWith(".zip", ignoreCase = true)) {
+            extractFirmwareFromZip(cacheFile)
+        } else {
+            cacheFile
+        }
+        if (otaFile == null) {
+            toast(getString(R.string.demo_ota_copy_failed, "no .bin in $assetName"))
+            return
+        }
+        val dialog = AlertDialog.Builder(requireContext())
             .setTitle(R.string.demo_ota_demo_title)
-            .setMessage(R.string.demo_ota_demo_message)
-            .setPositiveButton(R.string.demo_confirm, null)
+            .setMessage(getString(R.string.demo_ota_progress, assetName, 0))
+            .setCancelable(false)
             .show()
+        DHBleSdk.ringOtaWithFileData(otaFile.absolutePath, object : OnFileTransferCallback {
+            override fun onProgress(pro: Float) {
+                dialog.setMessage(getString(R.string.demo_ota_progress, assetName, (pro * 100).toInt()))
+            }
+
+            override fun onFinish() {
+                dialog.dismiss()
+                toast(getString(R.string.demo_ota_success))
+            }
+
+            override fun onFail(code: Int) {
+                dialog.dismiss()
+                toast(getString(R.string.demo_ota_failed, Integer.toHexString(code)))
+            }
+        })
+    }
+
+    /** 从 Nordic DFU zip 包中解出第一个 .bin 固件（单镜像 image_index=0）。 */
+    private fun extractFirmwareFromZip(zipFile: File): File? {
+        return try {
+            ZipInputStream(zipFile.inputStream()).use { zis ->
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    if (!entry.isDirectory && entry.name.endsWith(".bin", ignoreCase = true)) {
+                        val outFile = File(zipFile.parentFile, "ota_${zipFile.nameWithoutExtension}.bin")
+                        outFile.outputStream().use { output -> zis.copyTo(output) }
+                        return outFile
+                    }
+                    entry = zis.nextEntry
+                }
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun showAlarmActions() {
@@ -666,6 +749,29 @@ class DeviceFragment : Fragment() {
         DHBleSdk.deviceSetBoAlertCmd(enabled, value)
     }
 
+    private fun showVibrationControl() {
+        val labels = arrayOf(getString(R.string.demo_vibration_once),
+            getString(R.string.demo_vibration_continuous), getString(R.string.demo_vibration_loop),
+            getString(R.string.demo_vibration_stop))
+        choose(getString(R.string.demo_vibration_control), labels) { index ->
+            val parameters = when (index) {
+                0 -> intArrayOf(3, 2, 0, 0, 0)
+                1 -> intArrayOf(255, 2, 0, 0, 0)
+                2 -> intArrayOf(255, 2, 3, 2, 10)
+                else -> intArrayOf(255, 0, 0, 0, 0)
+            }
+            DHBleSdk.controlVibration(parameters[0], parameters[1], parameters[2],
+                parameters[3], parameters[4], object : CustomStatusCallback {
+                    override fun onSuccess() {
+                        if (_binding != null && isAdded) toast(getString(R.string.demo_setting_success))
+                    }
+                    override fun onFail(errorCode: Int) {
+                        if (_binding != null && isAdded) toast(getString(R.string.demo_setting_failed, errorCode))
+                    }
+                })
+        }
+    }
+
     private fun editVibration(settingId: String) {
         choose(getString(R.string.demo_vibration_strength), arrayOf(getString(R.string.demo_off), getString(R.string.demo_low), getString(R.string.demo_medium), getString(R.string.demo_high))) { level ->
             showNumberPicker(getString(R.string.demo_vibration_count), 0, 6, 2, getString(R.string.demo_count_value, 1).replace("1", "").trim()) { count ->
@@ -810,7 +916,8 @@ class DeviceFragment : Fragment() {
                 chooseIntervalThenTimeRange(settingId, data?.remindDuration ?: 60,
                     data?.startHour ?: 9, data?.startMin ?: 0,
                     data?.endHour ?: 18, data?.endMin ?: 0,
-                    getString(R.string.demo_sedentary), getString(R.string.demo_sedentary_interval)) { bean, cb ->
+                    getString(R.string.demo_sedentary), getString(R.string.demo_sedentary_interval),
+                    intArrayOf(5, 15, 30, 45, 60, 90, 120)) { bean, cb ->
                     DHBleSdk.setSedentaryRemind(bean, cb)
                 }
             }
@@ -827,7 +934,8 @@ class DeviceFragment : Fragment() {
                 chooseIntervalThenTimeRange(settingId, data?.remindDuration ?: 30,
                     data?.startHour ?: 8, data?.startMin ?: 0,
                     data?.endHour ?: 22, data?.endMin ?: 0,
-                    getString(R.string.demo_drink_reminder), getString(R.string.demo_drink_reminder_interval)) { bean, cb ->
+                    getString(R.string.demo_drink_reminder), getString(R.string.demo_drink_reminder_interval),
+                    intArrayOf(15, 30, 45, 60, 90, 120)) { bean, cb ->
                     DHBleSdk.setDrinkRemind(bean, cb)
                 }
             }
@@ -836,12 +944,12 @@ class DeviceFragment : Fragment() {
 
     private fun chooseIntervalThenTimeRange(
         settingId: String, duration: Int, sH: Int, sM: Int, eH: Int, eM: Int,
-        title: String, intervalTitle: String,
+        title: String, intervalTitle: String, intervals: IntArray,
         send: (DrinkReminderBean, ReminderSettingCallback) -> Unit
     ) {
-        val intervals = intArrayOf(15, 30, 45, 60, 90, 120)
         val labels = intervals.map { getString(R.string.demo_minutes_value, it) }.toTypedArray()
-        val presetIndex = intervals.indexOf(duration).takeIf { it >= 0 } ?: 3
+        // 回读值不在档位中时回落到 60 分钟
+        val presetIndex = intervals.indexOf(duration).takeIf { it >= 0 } ?: intervals.indexOf(60)
         choose(intervalTitle, labels, presetIndex) { intervalIndex ->
             val interval = intervals[intervalIndex]
             editTimeRange(title, sH, sM, eH, eM) { enabled, sh, sm, eh, em ->

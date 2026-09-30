@@ -30,6 +30,8 @@ class NewMainActivity : AppCompatActivity() {
         DHBleSdk.prepareAutoPassword("4567")
         DemoStateStore.attach(this)
 
+    //    DHBleSdk.preparePasswordReset("4567")
+
         binding.bottomNavigation.setOnNavigationItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.navigation_health -> {

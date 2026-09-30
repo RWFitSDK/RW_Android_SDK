@@ -181,6 +181,7 @@ interface RingConnectBleCallback {
 
 > 调用后请等待 `onRingConnectFailed` 回调完成，再发起重连或绑定其他设备，确保当前连接及相关资源已完成释放。
 
+
 ##### 3.1.5 本地绑定与自动重连,解绑
 
 > [!IMPORTANT]
@@ -242,7 +243,34 @@ DeviceFuncV2Model类属性定义:
 | isDrink                     | 是否支持喝水提醒设置       |
 | isSupportScreenControl      | 是否支持即时屏幕亮灭控制   |
 | isSupportUnitSetting        | 是否支持公制/英制单位设置  |
+| isSupportVibrationControl | 是否支持自定义震动控制 |
 
+
+##### 3.1.7 读取连接态 RSSI
+
+`DHBleSdk.readRssi(callback: RssiCallback)`：通过 `onRssiRead(rssi: Int)` 返回信号强度（dBm），失败通过 `onRssiFailed(errorCode: Int)` 返回。一次性回调均在主线程，无需订阅或 `dispose()`。
+
+| 错误码 | 说明 |
+| --- | --- |
+| `ERROR_NOT_CONNECTED` (-1) | 未连接或已断连 |
+| `ERROR_BUSY` (-2) | 已有 RSSI 请求或 OTA 正在进行 |
+| `ERROR_START_FAILED` (-3) | 系统读取启动失败 |
+| `ERROR_TIMEOUT` (-4) | 读取启动后 5 秒无结果 |
+| 其他非零值 | Android GATT 失败状态 |
+
+以上错误常量定义在 `RssiCallback` 中。
+
+```kotlin
+DHBleSdk.readRssi(object : RssiCallback {
+    override fun onRssiRead(rssi: Int) {
+        // 更新信号强度，单位 dBm
+    }
+
+    override fun onRssiFailed(errorCode: Int) {
+        // 处理失败；ERROR_BUSY 时跳过本次读取
+    }
+})
+```
 
 ### 3.2 设备功能操作
 
@@ -252,7 +280,7 @@ DeviceFuncV2Model类属性定义:
 
 > 获取SDK版本号.
 
-方法说明:
+方法说明: 
 
 `DHBleSdk.getSDKVersion()`
 
@@ -1785,6 +1813,38 @@ DHBleSdk.setDrinkRemind(DrinkReminderBean().apply {
 })
 ```
 
+##### 3.2.1.31 控制自定义震动次数与强度
+
+需功能配置表 `SupportMenuBean.isSupportVibrationControl` 支持。
+
+```kotlin
+fun controlVibration(mode: Int, strength: Int, groupCount: Int,
+                     frequency: Int, pause: Int, callback: CustomStatusCallback)
+```
+
+| 参数 | 说明 |
+| --- | --- |
+| mode | 1～15：单轮震动次数；255：持续或节奏循环 |
+| strength | 0：停止；1：弱；2：中；3：强 |
+| groupCount | 循环时每组震动次数，1～15；不使用循环时填0 |
+| frequency | 循环时组内频率，1～10次/秒；不使用循环时填0 |
+| pause | 循环时组间停顿，1～255，单位100ms；不使用循环时填0 |
+| callback | onSuccess() / onFail(errorCode)，结果返回后自动释放，无需订阅或 dispose |
+
+单轮和持续模式的三个循环参数均填0；节奏循环模式使用 mode=255，并填写全部循环参数。strength=0停止震动，循环参数忽略。参数非法抛出 IllegalArgumentException。前一次请求返回后再发起下一次。
+
+```kotlin
+val callback = object : CustomStatusCallback {
+    override fun onSuccess() {}
+    override fun onFail(errorCode: Int) {}
+}
+DHBleSdk.controlVibration(3, 2, 0, 0, 0, callback) // 中强度震动3次
+// 其他用法（分别调用）：
+// controlVibration(255, 2, 0, 0, 0, callback) // 持续震动
+// controlVibration(255, 2, 3, 2, 10, callback) // 每组3次、2次/秒、组间停顿1秒
+// controlVibration(255, 0, 0, 0, 0, callback) // 停止震动
+```
+
 #### 3.2.2 健康数据同步(实时单次与全天检测)
 
 > 健康数据检测有两种方式: 实时单次检测与全天检测。健康数据包括心率,血氧,压力,HRV,睡眠等, **睡眠无实时检测**。 
@@ -1871,7 +1931,7 @@ DHBleSdk.controlOpen(0, HealthDataType.HEART_RATE.code, object : HealthMeasureme
 
 `fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
 
-类型说明:
+类型说明: 
 
 | HealthMonitorType | 监测项        | 间隔       | 功能表属性                     |
 | ----------------- | ------------- | ---------- | ------------------------------ |
@@ -1925,9 +1985,9 @@ DHBleSdk.getHealthMonitor(HealthMonitorType.BLOOD_OXYGEN, object : ReminderSetti
 
 方法说明: 
 
-`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
+`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)` 
 
-`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
+`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)` 
 
 
 
@@ -3136,6 +3196,11 @@ fun unregisterSleepRawDataCallback() {
    
 
 ## SDK修订记录
+
+**v2.0.0_20260930** (2026.09.30)
+
+- 添加连接态 RSSI 读取接口 `readRssi`(3.1.7)
+- 添加自定义震动控制接口 `controlVibration`(3.2.1.31), 功能配置表添加`isSupportVibrationControl`
 
 **v2.0.0_20260922** (2026.09.22)
 
