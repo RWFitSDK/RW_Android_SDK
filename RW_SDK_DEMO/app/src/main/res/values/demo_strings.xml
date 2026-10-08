@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="demo_battery_not_charging">Not charging</string>
+    <string name="demo_battery_charging">Charging</string>
+    <string name="demo_battery_full">Fully charged</string>
     <string name="demo_health">Health</string>
     <string name="demo_device">Device</string>
     <string name="demo_health_data">Health data</string>
@@ -194,6 +197,7 @@
     <string name="demo_ota_success">OTA success</string>
     <string name="demo_ota_failed">OTA failed: 0x%1$s</string>
     <string name="demo_ota_copy_failed">Copy firmware failed: %1$s</string>
+    <string name="demo_ota_no_packages">No firmware package available</string>
 
     <string name="demo_find_sent">Find command sent</string>
     <string name="demo_enter_camera_mode">Enter camera mode</string>

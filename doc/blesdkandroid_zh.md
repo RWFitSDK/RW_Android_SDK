@@ -33,11 +33,48 @@
 
 **第2步: 手动部署添加依赖库**
 
-1. 导入aar到项目build.gradle里
+四种 SDK AAR 只能选择一个, 不要同时引入. basic 使用 RW 自有 OTA 方案; 需要使用 TL 或 Nordic OTA 升级功能时选择对应版本, 不需要这些 OTA 功能时可选择 basic:
+
+| 版本 | 适用场景 | 额外依赖 |
+| ---- | -------- | -------- |
+| basic | 不使用 TL / Nordic OTA | 无 |
+| tl | 需要 TL 平台 OTA 升级 | fota-1.5-release.aar |
+| nordic | 需要 Nordic 平台 OTA 升级 | mcumgr-ble:3.3.1 |
+| tlNordic | 同时需要 TL 与 Nordic 平台 OTA 升级 | 两者都引入 |
+
+将所选 RW SDK AAR 及所需的本地 AAR 依赖文件复制到应用模块的 `app/libs/` 目录, 并在 `app/build.gradle`（Groovy）的 `dependencies { ... }` 中仅添加所选版本对应的一组依赖; 文件名以实际下载版本为准:
+
+**basic:**
 
 ```groovy
-implementation files('libs/blesdk_rwfit_release_260130.aar')
+implementation files('libs/blesdk-rwfit-release_v2_261008.aar')
 ```
+
+**tl:**
+
+```groovy
+implementation files('libs/blesdk-rwfit-tl-release_v2_261008.aar')
+implementation files('libs/fota-1.5-release.aar')
+```
+
+**nordic:**
+
+```groovy
+implementation files('libs/blesdk-rwfit-nordic-release_v2_261008.aar')
+implementation 'no.nordicsemi.android:mcumgr-ble:3.3.1'
+```
+
+**tlNordic:**
+
+```groovy
+implementation files('libs/blesdk-rwfit-tlNordic-release_v2_261008.aar')
+implementation files('libs/fota-1.5-release.aar')
+implementation 'no.nordicsemi.android:mcumgr-ble:3.3.1'
+```
+
+> [!NOTE]
+>
+> 编译环境要求: basic / tl 需 compileSdk 34 及以上; nordic / tlNordic 需 compileSdk 37 及以上, 已验证的参考配置为 AGP 9.1.1 / Gradle 9.3.1 / Kotlin 2.4.20 / compileSdk 37. 最低运行系统要求不变, 为 Android 7.0(API 24)及以上.
 
 
 
@@ -124,6 +161,8 @@ public interface ScanDeviceCallback {
 //4. 取消注册回调
 ScanBleService.getService().unRegisterScanBleCallback()
 ```
+
+扫描结果 `BleDevice.getBatteryStatus()` 返回充电状态：`0` 未充电，`1` 充电中，`2` 充满，`-1` 未提供或不支持。此字段不是电量百分比，电量百分比需连接后获取（3.2.1.4）。
 
 ##### 3.1.2 停止搜索
 
@@ -2388,6 +2427,11 @@ OTA流程只需关注 `data` 中的以下字段，其他字段可以忽略：
 
 `fun ringOtaWithFileData(filePath: String, callback: OnFileTransferCallback)`
 
+> [!TIP]
+> **固件文件：** Nordic 平台请传入 ZIP 固件包路径，无需自行解压；其它平台请传入对应的固件文件路径。
+>
+> **AAR 选择：** `basic` 支持原有平台，`tl` 增加 TL 支持，`nordic` 增加 Nordic 支持，`tlNordic` 同时增加 TL 和 Nordic 支持。依赖配置参见“第2步：手动部署添加依赖库”。
+
 参数说明:
 
 | 参数     | 类型                   | 说明         |
@@ -2798,7 +2842,7 @@ DHBleSdk.getRecordStatus(object : RecordStatusCallback {
 | fileId                 | long |      | 文件ID, 下载(3.2.5.4)/删除(3.2.5.5)时使用; |
 | fileSize               | long |      | 文件大小, 单位字节(B);                   |
 | duration               | long |      | 录音时长, 单位秒(s);                     |
-| timestamp              | long |      | 录音时间, Unix秒时间戳, SDK已完成转换; |
+| timestamp              | long |      | 录音时间, Unix时间戳, 单位秒(s); |
 
 调用示例:
 
@@ -2819,7 +2863,7 @@ DHBleSdk.getRecordFileList(object : RecordFileListCallback {
 
 ##### 3.2.5.4 下载录音文件
 
-> 按文件ID下载单个录音文件内容; SDK内部自动处理分包确认与偏移校验, 传输过程中持续回调进度, `complete=true` 时 `fileData` 为完整文件数据.
+> 按文件ID下载单个录音文件内容; 传输过程中持续回调进度, `complete=true` 时 `fileData` 为完整文件数据.
 >
 > 进度与最终文件数据经 [callback] 的 onResult(RecordFileTransferBean) 多帧返回.
 >
@@ -2842,7 +2886,7 @@ DHBleSdk.getRecordFileList(object : RecordFileListCallback {
 | -------------------------- | ------- | ---- | ----------------------------------------- |
 | fileType                   | Int     | 整形 | 0x01: 录音;                               |
 | duration                   | long    |      | 录音时长, 单位秒(s);                      |
-| timestamp                  | long    |      | 录音时间, Unix秒时间戳, SDK已完成转换;             |
+| timestamp                  | long    |      | 录音时间, Unix时间戳, 单位秒(s);             |
 | fileId                     | long    |      | 文件ID;                                   |
 | format                     | Int     | 整形 | 0x02: OPUS;                               |
 | fileSize                   | long    |      | 文件总大小, 单位字节(B);                  |
@@ -3196,6 +3240,11 @@ fun unregisterSleepRawDataCallback() {
    
 
 ## SDK修订记录
+
+**v2.0.0_20261008** (2026.10.08)
+
+- 添加扫描结果充电状态 `BleDevice.getBatteryStatus()`(3.1.1)
+- 集成说明改为 basic / tl / nordic / tlNordic 四个 AAR 版本的选型与依赖说明(第2步)
 
 **v2.0.0_20260930** (2026.09.30)
 

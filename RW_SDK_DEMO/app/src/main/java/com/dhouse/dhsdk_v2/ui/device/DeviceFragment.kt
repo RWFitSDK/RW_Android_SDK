@@ -26,7 +26,6 @@ import com.example.blesdk.blering.HealthMonitorType
 import com.example.blesdk.callback.status.CustomStatusCallback
 import com.example.blesdk.utils.Constants
 import java.io.File
-import java.util.zip.ZipInputStream
 
 class DeviceFragment : Fragment() {
     private var _binding: FragmentDeviceBinding? = null
@@ -487,14 +486,17 @@ class DeviceFragment : Fragment() {
     }
 
     private fun showOtaIntegrationInfo() {
-        val packages = arrayOf(
-            "YCLY02_2.3.1_2.fot",
-            "YCLY02_2.3.2_2.fot",
-            "sy19_v1.1.8.zip",
-            "sy19_v1.1.9.zip",
-            "dfu_application.zip"
-        )
-        choose(getString(R.string.demo_ota_select_package), packages) { index ->
+        // 固件包从 assets/ota 动态列出; 公开 Demo 不带该目录, 列表为空时仅提示, 不展示任何内置包名
+        val packages = try {
+            requireContext().assets.list("ota")?.sorted() ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+        if (packages.isEmpty()) {
+            toast(getString(R.string.demo_ota_no_packages))
+            return
+        }
+        choose(getString(R.string.demo_ota_select_package), packages.toTypedArray()) { index ->
             startOtaUpgrade(packages[index])
         }
     }
@@ -510,22 +512,12 @@ class DeviceFragment : Fragment() {
             toast(getString(R.string.demo_ota_copy_failed, e.message ?: ""))
             return
         }
-        // Nordic DFU 包是 zip（signed.bin + manifest.json），解出 bin 后再交给 SDK
-        val otaFile = if (assetName.endsWith(".zip", ignoreCase = true)) {
-            extractFirmwareFromZip(cacheFile)
-        } else {
-            cacheFile
-        }
-        if (otaFile == null) {
-            toast(getString(R.string.demo_ota_copy_failed, "no .bin in $assetName"))
-            return
-        }
         val dialog = AlertDialog.Builder(requireContext())
             .setTitle(R.string.demo_ota_demo_title)
             .setMessage(getString(R.string.demo_ota_progress, assetName, 0))
             .setCancelable(false)
             .show()
-        DHBleSdk.ringOtaWithFileData(otaFile.absolutePath, object : OnFileTransferCallback {
+        DHBleSdk.ringOtaWithFileData(cacheFile.absolutePath, object : OnFileTransferCallback {
             override fun onProgress(pro: Float) {
                 dialog.setMessage(getString(R.string.demo_ota_progress, assetName, (pro * 100).toInt()))
             }
@@ -540,26 +532,6 @@ class DeviceFragment : Fragment() {
                 toast(getString(R.string.demo_ota_failed, Integer.toHexString(code)))
             }
         })
-    }
-
-    /** 从 Nordic DFU zip 包中解出第一个 .bin 固件（单镜像 image_index=0）。 */
-    private fun extractFirmwareFromZip(zipFile: File): File? {
-        return try {
-            ZipInputStream(zipFile.inputStream()).use { zis ->
-                var entry = zis.nextEntry
-                while (entry != null) {
-                    if (!entry.isDirectory && entry.name.endsWith(".bin", ignoreCase = true)) {
-                        val outFile = File(zipFile.parentFile, "ota_${zipFile.nameWithoutExtension}.bin")
-                        outFile.outputStream().use { output -> zis.copyTo(output) }
-                        return outFile
-                    }
-                    entry = zis.nextEntry
-                }
-                null
-            }
-        } catch (e: Exception) {
-            null
-        }
     }
 
     private fun showAlarmActions() {

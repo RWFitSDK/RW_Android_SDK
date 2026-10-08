@@ -34,13 +34,50 @@ This document is only applicable to RW's Bluetooth devices.
 
 To use the RW BLE SDK for Android in your development project, you need to install Android Studio.
 
-**Step 2: Manually deploy and add the dependency libraries.**
+**Step 2: Add the SDK and its dependencies.**
 
-Import the AAR file into your project's build.gradle file.
+Choose exactly one of the four RW SDK AAR variants. The basic variant supports RW OTA; choose a variant with TL or Nordic support if you need those OTA features. Otherwise, choose basic:
+
+| Version | Scenario | Additional dependency |
+| ------- | -------- | --------------------- |
+| basic | No TL / Nordic OTA | None |
+| tl | Requires TL platform OTA upgrade | fota-1.5-release.aar |
+| nordic | Requires Nordic platform OTA upgrade | mcumgr-ble:3.3.1 |
+| tlNordic | Requires both TL and Nordic platform OTA upgrades | Both of the above |
+
+Copy the selected RW SDK AAR and any required local AAR dependencies into `app/libs/`. Add only the matching dependency block below to `dependencies { ... }` in `app/build.gradle` (Groovy). Replace the example filenames with the names of your downloaded files:
+
+**basic:**
 
 ```groovy
-implementation files('libs/blesdk_rwfit_release_260130.aar')
+implementation files('libs/blesdk-rwfit-release_v2_261008.aar')
 ```
+
+**tl:**
+
+```groovy
+implementation files('libs/blesdk-rwfit-tl-release_v2_261008.aar')
+implementation files('libs/fota-1.5-release.aar')
+```
+
+**nordic:**
+
+```groovy
+implementation files('libs/blesdk-rwfit-nordic-release_v2_261008.aar')
+implementation 'no.nordicsemi.android:mcumgr-ble:3.3.1'
+```
+
+**tlNordic:**
+
+```groovy
+implementation files('libs/blesdk-rwfit-tlNordic-release_v2_261008.aar')
+implementation files('libs/fota-1.5-release.aar')
+implementation 'no.nordicsemi.android:mcumgr-ble:3.3.1'
+```
+
+> [!NOTE]
+>
+> Build requirements: basic / tl require `compileSdk` 34 or higher; nordic / tlNordic require `compileSdk` 37 or higher. A verified reference configuration for nordic / tlNordic is AGP 9.1.1 / Gradle 9.3.1 / Kotlin 2.4.20 / compileSdk 37. The minimum supported Android version remains Android 7.0 (API 24).
 
 
 **Step 3: You need to enable Bluetooth on your phone and grant Bluetooth and location permissions.**
@@ -129,6 +166,8 @@ public interface ScanDeviceCallback {
 ScanBleService.getService().unRegisterScanBleCallback()
 ```
 
+`BleDevice.getBatteryStatus()` returns the charging status: `0` not charging, `1` charging, `2` full, or `-1` unavailable or unsupported. This is not a battery percentage; read the battery level after connecting (3.2.1.4).
+
 ##### 3.1.2 Stop searching
 
 > Interface description: Stop searching for Bluetooth devices.
@@ -162,7 +201,7 @@ interface RingConnectBleCallback {
 
 `RingConnectBleCallback` Interface Description:
 
-| 方法                  | 说明                                                         |
+| Method                | Description                                                  |
 | :-------------------- | ------------------------------------------------------------ |
 | onRingConnecting      | Connecting                                                   |
 | onRingConnected       | After calling `connectDeviceWithModel`, the function will return upon successful connection. |
@@ -2312,6 +2351,11 @@ Method Description:
 
 `fun ringOtaWithFileData(filePath: String, callback: OnFileTransferCallback)`
 
+> [!TIP]
+> **Firmware file:** For Nordic devices, pass the ZIP firmware package path without extracting it. For other platforms, pass the corresponding firmware file path.
+>
+> **AAR selection:** `basic` supports the existing platforms, `tl` adds TL support, `nordic` adds Nordic support, and `tlNordic` adds both TL and Nordic support. For dependency configuration, see “Step 2: Add the SDK and its dependencies.”
+
 Parameter Description:
 
 | Parameter | Type                   | Description        |
@@ -2708,7 +2752,7 @@ RecordFileItemBean parameters:
 | fileId             | long |             | File ID, used for download (3.2.5.4) / delete (3.2.5.5); |
 | fileSize           | long |             | File size, in bytes (B);                    |
 | duration           | long |             | Recording duration, in seconds (s);        |
-| timestamp          | long |             | Recording time in Unix seconds, converted by the SDK; |
+| timestamp          | long |             | Recording time as a Unix timestamp, in seconds (s); |
 
 Example of usage:
 
@@ -2729,7 +2773,7 @@ DHBleSdk.getRecordFileList(object : RecordFileListCallback {
 
 ##### 3.2.5.4 Download Recording File
 
-> Download a single recording file by file ID; the SDK automatically handles chunked acknowledgement and offset verification, keeps reporting progress during transmission, and `complete=true` means `fileData` holds the complete file data.
+> Download a single recording file by file ID. Progress is reported during transmission, and `complete=true` means `fileData` holds the complete file data.
 >
 > Progress and the final file data are returned via [callback]'s onResult(RecordFileTransferBean) in multiple frames.
 >
@@ -2752,7 +2796,7 @@ RecordFileTransferBean parameters:
 | ---------------------- | ------- | ----------- | -------------------------------------------------- |
 | fileType               | Int     | Integer     | 0x01: recording;                                   |
 | duration               | long    |             | Recording duration, in seconds (s);                |
-| timestamp              | long    |             | Recording time in Unix seconds, converted by the SDK;         |
+| timestamp              | long    |             | Recording time as a Unix timestamp, in seconds (s);         |
 | fileId                 | long    |             | File ID;                                           |
 | format                 | Int     | Integer     | 0x02: OPUS;                                         |
 | fileSize               | long    |             | Total file size, in bytes (B);                      |
@@ -3099,6 +3143,11 @@ fun unregisterSleepRawDataCallback() {
 ```
 
 ## SDK Revision History
+
+**V2.0.0_20261008** (2026.10.08)
+
+- Added charging status to scan results via `BleDevice.getBatteryStatus()` (3.1.1).
+- Updated the integration guide: Step 2 now describes selecting one of the four AAR versions (basic / tl / nordic / tlNordic) and their dependencies.
 
 **V2.0.0_20260930** (2026.09.30)
 
