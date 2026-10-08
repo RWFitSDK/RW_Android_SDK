@@ -344,12 +344,15 @@ class RecordingActivity : AppCompatActivity() {
             dir.mkdirs()
         }
         val duration = item?.duration ?: data.duration
-        val completedAt = data.completedAt.takeIf { it > 0 } ?: System.currentTimeMillis() / 1000L
-        val file = File(dir, "${data.fileId}_${duration}_${completedAt}.opus")
+        // 文件名使用录音时间戳(SDK已转Unix秒); 设备未提供时回退传输完成时刻。
+        val recordTimestamp = data.timestamp.takeIf { it > 0 }
+            ?: data.completedAt.takeIf { it > 0 }
+            ?: System.currentTimeMillis() / 1000L
+        val file = File(dir, "${data.fileId}_${duration}_${recordTimestamp}.opus")
         file.writeBytes(opusBytes)
         data.filePath = file.absolutePath
         binding.transferStatus.text = "Transfer: saved ${file.absolutePath}"
-        Log.e("RWSDK", "Record file saved ${file.absolutePath} rawSize=${bytes.size} opusSize=${opusBytes.size} completedAt=$completedAt")
+        Log.e("RWSDK", "Record file saved ${file.absolutePath} rawSize=${bytes.size} opusSize=${opusBytes.size} recordTimestamp=$recordTimestamp")
         refreshFileList()
         toast("Saved: ${file.name}")
         return file.absolutePath
