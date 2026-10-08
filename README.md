@@ -17,14 +17,10 @@ All four variants share the same standard Bluetooth and data APIs; they differ i
 
 | 版本 / Variant | AAR 文件名 / Filename | OTA 支持 / Support |
 | --- | --- | --- |
-| basic | `blesdk-rwfit-release_v2_<YYMMDD>.aar` | RW |
-| tl | `blesdk-rwfit-tl-release_v2_<YYMMDD>.aar` | RW + TL |
-| nordic | `blesdk-rwfit-nordic-release_v2_<YYMMDD>.aar` | RW + Nordic |
-| tlNordic | `blesdk-rwfit-tlNordic-release_v2_<YYMMDD>.aar` | RW + TL + Nordic |
-
-`<YYMMDD>` 表示发布日期，文件名以实际下载版本为准。
-
-`<YYMMDD>` represents the release date. Use the filename of the downloaded AAR.
+| basic | `blesdk-rwfit-release_v2_261008.aar` | RW |
+| tl | `blesdk-rwfit-tl-release_v2_261008.aar` | RW + TL |
+| nordic | `blesdk-rwfit-nordic-release_v2_261008.aar` | RW + Nordic |
+| tlNordic | `blesdk-rwfit-tlNordic-release_v2_261008.aar` | RW + TL + Nordic |
 
 不需要 TL 或 Nordic OTA 时，选择 basic 即可。Demo 使用 tlNordic 版本。各版本所需依赖和编译环境，请参考[中文文档](doc/blesdkandroid_zh.md)「快速开始 → 第2步」。
 
