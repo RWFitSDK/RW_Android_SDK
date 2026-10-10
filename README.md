@@ -17,8 +17,8 @@ Both variants share the same standard Bluetooth and data APIs; the nordic varian
 
 | 版本 / Variant | AAR 文件名 / Filename | OTA 支持 / Support |
 | --- | --- | --- |
-| basic | `blesdk-rwfit-release_v2_261008.aar` | PXI / Telink / TL |
-| nordic | `blesdk-rwfit-nordic-release_v2_261008.aar` | PXI / Telink / TL / Nordic |
+| basic | `blesdk-rwfit-release_v2_261008.aar` | RW OTA |
+| nordic | `blesdk-rwfit-nordic-release_v2_261008.aar` | RW OTA + Nordic OTA |
 
 不需要 Nordic OTA 时，选择 basic 即可。Demo 使用 nordic 版本。各版本所需依赖和编译环境，请参考[中文文档](doc/blesdkandroid_zh.md)「快速开始 → 第2步」。
 
