@@ -85,9 +85,8 @@ dependencies {
     //eventbus
     implementation 'org.greenrobot:eventbus:3.2.0'
     implementation 'com.github.getActivity:XXPermissions:13.2'
-    implementation files('libs/blesdk-rwfit-tlNordic-release_v2_261008.aar')
-    // tlNordic OTA 运行时依赖: TL fota 本地 AAR + Nordic mcumgr(SDK 侧 compileOnly 不传递)
-    implementation files('libs/fota-1.5-release.aar')
+    implementation files('libs/blesdk-rwfit-nordic-release_v2_261008.aar')
+    // Nordic mcumgr 需由应用引入。
     implementation 'no.nordicsemi.android:mcumgr-ble:3.3.1'
 
 

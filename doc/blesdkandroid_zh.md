@@ -33,28 +33,19 @@
 
 **第2步: 手动部署添加依赖库**
 
-四种 SDK AAR 只能选择一个, 不要同时引入. basic 使用 RW 自有 OTA 方案; 需要使用 TL 或 Nordic OTA 升级功能时选择对应版本, 不需要这些 OTA 功能时可选择 basic:
+两种 SDK AAR 只能选择一个, 不要同时引入. 需要使用 Nordic OTA 升级功能时选择对应版本, 不需要时可选 basic:
 
 | 版本 | 适用场景 | 额外依赖 |
 | ---- | -------- | -------- |
-| basic | 不使用 TL / Nordic OTA | 无 |
-| tl | 需要 TL 平台 OTA 升级 | fota-1.5-release.aar |
+| basic | 不使用 Nordic OTA | 无 |
 | nordic | 需要 Nordic 平台 OTA 升级 | mcumgr-ble:3.3.1 |
-| tlNordic | 同时需要 TL 与 Nordic 平台 OTA 升级 | 两者都引入 |
 
-将所选 RW SDK AAR 及所需的本地 AAR 依赖文件复制到应用模块的 `app/libs/` 目录, 并在 `app/build.gradle`（Groovy）的 `dependencies { ... }` 中仅添加所选版本对应的一组依赖; 文件名以实际下载版本为准:
+将所选 RW SDK AAR 文件复制到应用模块的 `app/libs/` 目录, 并在 `app/build.gradle`（Groovy）的 `dependencies { ... }` 中仅添加所选版本对应的一组依赖; 文件名以实际下载版本为准:
 
 **basic:**
 
 ```groovy
 implementation files('libs/blesdk-rwfit-release_v2_261008.aar')
-```
-
-**tl:**
-
-```groovy
-implementation files('libs/blesdk-rwfit-tl-release_v2_261008.aar')
-implementation files('libs/fota-1.5-release.aar')
 ```
 
 **nordic:**
@@ -64,17 +55,9 @@ implementation files('libs/blesdk-rwfit-nordic-release_v2_261008.aar')
 implementation 'no.nordicsemi.android:mcumgr-ble:3.3.1'
 ```
 
-**tlNordic:**
-
-```groovy
-implementation files('libs/blesdk-rwfit-tlNordic-release_v2_261008.aar')
-implementation files('libs/fota-1.5-release.aar')
-implementation 'no.nordicsemi.android:mcumgr-ble:3.3.1'
-```
-
 > [!NOTE]
 >
-> 编译环境要求: basic / tl 需 compileSdk 34 及以上; nordic / tlNordic 需 compileSdk 37 及以上, 已验证的参考配置为 AGP 9.1.1 / Gradle 9.3.1 / Kotlin 2.4.20 / compileSdk 37. 最低运行系统要求不变, 为 Android 7.0(API 24)及以上.
+> 编译环境要求: basic 需 compileSdk 34 及以上; nordic 需 compileSdk 37 及以上, 已验证的参考配置为 AGP 9.1.1 / Gradle 9.3.1 / Kotlin 2.4.20 / compileSdk 37. 最低运行系统要求不变, 为 Android 7.0(API 24)及以上.
 
 
 
@@ -2430,7 +2413,7 @@ OTA流程只需关注 `data` 中的以下字段，其他字段可以忽略：
 > [!TIP]
 > **固件文件：** Nordic 平台请传入 ZIP 固件包路径，无需自行解压；其它平台请传入对应的固件文件路径。
 >
-> **AAR 选择：** `basic` 支持原有平台，`tl` 增加 TL 支持，`nordic` 增加 Nordic 支持，`tlNordic` 同时增加 TL 和 Nordic 支持。依赖配置参见“第2步：手动部署添加依赖库”。
+> **AAR 选择：** 需要 Nordic OTA 时选择 `nordic`，其它情况选择 `basic`。依赖配置参见“第2步：手动部署添加依赖库”。
 
 参数说明:
 
@@ -3244,7 +3227,7 @@ fun unregisterSleepRawDataCallback() {
 **v2.0.0_20261008** (2026.10.08)
 
 - 添加扫描结果充电状态 `BleDevice.getBatteryStatus()`(3.1.1)
-- 集成说明改为 basic / tl / nordic / tlNordic 四个 AAR 版本的选型与依赖说明(第2步)
+- 集成说明改为 basic / nordic 两个 AAR 版本的选型与依赖说明(第2步)
 
 **v2.0.0_20260930** (2026.09.30)
 
