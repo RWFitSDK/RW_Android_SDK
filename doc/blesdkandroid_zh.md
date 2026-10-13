@@ -1253,7 +1253,7 @@ DevicePushType 类型说明:
 | POWER          | 电量与充电状态   | PowerBean           | [3.2.1.4.1 实时电量监听](#32141-实时电量监听) |
 | RECORD_STATUS  | 录音状态推送     | RecordStatusBean    | [3.2.5.2 查询录音状态](#3252-查询录音状态)   |
 | MUSLIM_COUNT   | 赞念计数实时上报 | MuslimCountItemBean | [3.2.1.15 赞念开关](#32115-获取与设置赞念是否打开) |
-| TOUCH_EVENT    | 触摸/跌落事件    | TouchEventBean      | 设备端定制功能, 需固件集成启用;<br>TouchEventBean: <br>keyType(1: 触摸按键, 2: 跌落[需开启3.2.1.24](#32124-跌落提醒设置)), <br>touchType(1: 单击, 2: 双击, 3: 三击, 4: 长按, 5: 甩动; 跌落时默认1) |
+| TOUCH_EVENT    | 触摸/跌落/SOS/连续点击事件 | TouchEventBean | 需固件支持;<br>keyType：1: 触摸按键, 2: 跌落([需开启3.2.1.24](#32124-跌落提醒设置)), 3: SOS, 4: 连续点击。<br>touchType：触摸按键时 1: 单击, 2: 双击, 3: 三击, 4: 长按, 5: 甩动, 6: Release(长按后松手)；跌落时默认1；SOS时不使用；连续点击时表示次数(1-9) |
 
 方法说明:
 
@@ -1277,7 +1277,12 @@ private val devicePushListener = object : OnDevicePushListener {
       }
       DevicePushType.TOUCH_EVENT -> {
         val event = data.value as? TouchEventBean ?: return
-        Log.e("RWSDK", "touch keyType=${event.keyType} touchType=${event.touchType}")
+        when {
+          event.keyType == 3 -> Log.e("RWSDK", "SOS")
+          event.keyType == 4 -> Log.e("RWSDK", "连续点击次数=${event.touchType}")
+          event.keyType == 1 && event.touchType == 6 -> Log.e("RWSDK", "Release")
+          else -> Log.e("RWSDK", "touch keyType=${event.keyType} touchType=${event.touchType}")
+        }
       }
       DevicePushType.RECORD_STATUS -> {
         val recordStatus = data.value as? RecordStatusBean ?: return
@@ -3223,6 +3228,11 @@ fun unregisterSleepRawDataCallback() {
    
 
 ## SDK修订记录
+
+**v2.0.0_20261012** (2026.10.12)
+
+- 设备主动推送监听新增 SOS 与连续点击次数通知(3.2.1.21)
+- 设备主动推送监听新增 Release(长按后松手)事件，`keyType=1`、`touchType=6`(3.2.1.21)
 
 **v2.0.0_20261008** (2026.10.08)
 

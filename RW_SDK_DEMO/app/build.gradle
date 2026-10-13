@@ -85,7 +85,7 @@ dependencies {
     //eventbus
     implementation 'org.greenrobot:eventbus:3.2.0'
     implementation 'com.github.getActivity:XXPermissions:13.2'
-    implementation files('libs/blesdk-rwfit-nordic-release_v2_261008.aar')
+    implementation files('libs/blesdk-rwfit-nordic-release_v2_261012.aar')
     // Nordic mcumgr 需由应用引入。
     implementation 'no.nordicsemi.android:mcumgr-ble:3.3.1'
 

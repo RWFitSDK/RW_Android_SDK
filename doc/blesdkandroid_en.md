@@ -1228,7 +1228,7 @@ DevicePushType description:
 | POWER          | Battery and charging status | PowerBean           | [3.2.1.4.1 Real-time Battery Monitoring](#32141-real-time-battery-monitoring) |
 | RECORD_STATUS  | Recording status push       | RecordStatusBean    | [3.2.5.2 Query Recording Status](#3252-query-recording-status) |
 | MUSLIM_COUNT   | Muslim count real-time report | MuslimCountItemBean | [3.2.1.15 Reminder Function](#32115-getting-and-setting-whether-the-reminder-function-is-enabled) |
-| TOUCH_EVENT    | Touch / fall event          | TouchEventBean      | Touch and fall are reported regardless of whether the screen is on (a device-customized feature that requires firmware integration);<br>TouchEventBean: keyType (1: touch key, 2: fall [requires enabling 3.2.1.24](#32124-fall-detection-setting)), touchType (1: single tap, 2: double tap, 3: triple tap, 4: long press, 5: shake; defaults to 1 for fall) |
+| TOUCH_EVENT    | Touch / fall / SOS / repeated taps | TouchEventBean | Requires firmware support.<br>keyType: 1: touch key, 2: fall ([requires enabling 3.2.1.24](#32124-fall-detection-setting)), 3: SOS, 4: repeated taps.<br>touchType: for touch keys, 1: single tap, 2: double tap, 3: triple tap, 4: long press, 5: shake, 6: Release after a long press; defaults to 1 for fall; unused for SOS; contains the tap count (1-9) for repeated taps |
 
 Method Description:
 
@@ -1252,7 +1252,12 @@ private val devicePushListener = object : OnDevicePushListener {
       }
       DevicePushType.TOUCH_EVENT -> {
         val event = data.value as? TouchEventBean ?: return
-        Log.e("RWSDK", "touch keyType=${event.keyType} touchType=${event.touchType}")
+        when {
+          event.keyType == 3 -> Log.e("RWSDK", "SOS")
+          event.keyType == 4 -> Log.e("RWSDK", "Repeated tap count=${event.touchType}")
+          event.keyType == 1 && event.touchType == 6 -> Log.e("RWSDK", "Release")
+          else -> Log.e("RWSDK", "touch keyType=${event.keyType} touchType=${event.touchType}")
+        }
       }
       DevicePushType.RECORD_STATUS -> {
         val recordStatus = data.value as? RecordStatusBean ?: return
@@ -3126,6 +3131,11 @@ fun unregisterSleepRawDataCallback() {
 ```
 
 ## SDK Revision History
+
+**V2.0.0_20261012** (2026.10.12)
+
+- Added SOS and repeated-tap count notifications to device push monitoring (3.2.1.21).
+- Added Release events after a long press to device push monitoring: `keyType=1`, `touchType=6` (3.2.1.21).
 
 **V2.0.0_20261008** (2026.10.08)
 

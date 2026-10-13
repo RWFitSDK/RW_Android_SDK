@@ -84,7 +84,12 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
                 }
                 DevicePushType.TOUCH_EVENT -> {
                     val event = data.value as? TouchEventBean ?: return
-                    Log.e("RWSDK", "Touch push keyType=${event.keyType} touchType=${event.touchType}")
+                    when {
+                        event.keyType == 3 -> Log.e("RWSDK", "Touch push SOS keyType=3")
+                        event.keyType == 4 -> Log.e("RWSDK", "Touch push repeated taps keyType=4 count=${event.touchType}")
+                        event.keyType == 1 && event.touchType == 6 -> Log.e("RWSDK", "Touch push Release keyType=1 touchType=6")
+                        else -> Log.e("RWSDK", "Touch push keyType=${event.keyType} touchType=${event.touchType}")
+                    }
                 }
                 else -> Unit
             }
