@@ -16,10 +16,12 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import com.dhouse.dhsdk_v2.databinding.ActivityRecordingBinding
+import com.dhouse.dhsdk_v2.R
 import com.example.blesdk.DHBleSdk
 import com.example.blesdk.bean.function.RecordFileItemBean
 import com.example.blesdk.bean.function.RecordFileTransferBean
 import com.example.blesdk.bean.function.RecordStatusBean
+import com.example.blesdk.bean.function.RecordRealtimeDataBean
 import com.example.blesdk.callback.data.RecordControlCallback
 import com.example.blesdk.callback.data.RecordFileDeleteCallback
 import com.example.blesdk.callback.data.RecordFileListCallback
@@ -42,6 +44,10 @@ class RecordingActivity : AppCompatActivity() {
     private val rows = mutableListOf<RecordingRow>()
     private lateinit var adapter: RecordingAdapter
     private var isRecording = false
+    private var isRealtimeRecording = false
+    private var realtimePackets = 0L
+    private var realtimeBytes = 0L
+    private var lastRealtimeSequence: Int? = null
     private var downloadingFile: RecordFileItemBean? = null
 
     private sealed class RecordingRow {
@@ -58,6 +64,7 @@ class RecordingActivity : AppCompatActivity() {
         override fun onFail(errorCode: Int) {
             runOnUiThread {
                 binding.recordStatus.text = "Record status: query failed $errorCode"
+                updateRecordButtons()
             }
         }
 
@@ -71,6 +78,18 @@ class RecordingActivity : AppCompatActivity() {
 
     private val devicePushListener = object : OnDevicePushListener {
         override fun onPush(data: PushData) {
+            if (data.type == DevicePushType.RECORD_REALTIME_DATA) {
+                val packet = data.value as? RecordRealtimeDataBean ?: return
+                val size = packet.audioData.size
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    realtimePackets++
+                    realtimeBytes += size
+                    lastRealtimeSequence = packet.sequence
+                    updateRealtimeStatus()
+                }
+                return // 高频音频只显示统计，不逐包打印或保存内容。
+            }
             Log.e(
                 "RWSDK",
                 "OnDevicePushListener type=${data.type} value=${data.value} timestamp=${data.timestamp}"
@@ -92,12 +111,33 @@ class RecordingActivity : AppCompatActivity() {
         }
 
         override fun onFail(errorCode: Int) {
-            toast("Record control failed $errorCode")
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                updateRecordButtons()
+                toast("Record control failed $errorCode")
+            }
         }
 
         override fun onResult(data: Int) {
             Log.e("RWSDK", "RecordControlCallback onResult $data")
             queryRecordStatus()
+        }
+    }
+
+    private val realtimeControlCallback = object : RecordControlCallback {
+        override fun onSuccess() { queryRecordStatus() }
+
+        override fun onFail(errorCode: Int) { recordControlCallback.onFail(errorCode) }
+
+        override fun onResult(data: Int) {
+            Log.e("RWSDK", "recordRealtimeControl result status=$data")
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                isRecording = data == 1
+                isRealtimeRecording = isRecording
+                updateRecordButtons()
+                queryRecordStatus()
+            }
         }
     }
 
@@ -206,6 +246,18 @@ class RecordingActivity : AppCompatActivity() {
         binding.recordControl.setOnClickListener {
             DHBleSdk.recordControl(!isRecording, recordControlCallback)
         }
+        binding.recordRealtimeControl.setOnClickListener {
+            val start = !isRecording
+            if (start) {
+                realtimePackets = 0
+                realtimeBytes = 0
+                lastRealtimeSequence = null
+                updateRealtimeStatus()
+            }
+            binding.recordRealtimeControl.isEnabled = false
+            Log.e("RWSDK", "recordRealtimeControl start=$start")
+            DHBleSdk.recordRealtimeControl(start, realtimeControlCallback)
+        }
         binding.recordFormat.setOnClickListener { confirmFormat() }
         binding.loadFileList.setOnClickListener { loadFileList() }
         binding.fileList.setOnItemClickListener { _, _, position, _ ->
@@ -240,14 +292,29 @@ class RecordingActivity : AppCompatActivity() {
     }
 
     private fun updateRecordStatus(data: RecordStatusBean) {
+        isRecording = data.isRecording
+        isRealtimeRecording = data.isRecording && data.isRealtime
         val statusText = if (data.isRecording && data.startTime > 0) {
             val timeText = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date(data.startTime * 1000))
             "Record status: recording $timeText / ${data.duration}s"
         } else {
             if (data.isRecording) "Record status: recording" else "Record status: idle"
         }
-        binding.recordStatus.text = "$statusText\nStorage: ${fileSizeText(data.remainingCapacity)} / ${fileSizeText(data.totalCapacity)}"
-        binding.recordControl.text = if (data.isRecording) "Stop Record" else "Start Record"
+        val mode = getString(if (isRealtimeRecording) R.string.recording_mode_realtime else R.string.recording_mode_file)
+        binding.recordStatus.text = "$statusText\n$mode\nStorage: ${fileSizeText(data.remainingCapacity)} / ${fileSizeText(data.totalCapacity)}"
+        updateRecordButtons()
+    }
+
+    private fun updateRecordButtons() {
+        binding.recordControl.text = if (isRecording) "Stop Record" else "Start Record"
+        binding.recordRealtimeControl.setText(if (isRealtimeRecording) R.string.recording_stop_realtime else R.string.recording_start_realtime)
+        // 普通录音进行中不直接切换模式；先停止，再启动实时录音。
+        binding.recordRealtimeControl.isEnabled = !isRecording || isRealtimeRecording
+    }
+
+    private fun updateRealtimeStatus() {
+        binding.realtimeStatus.text = getString(R.string.recording_realtime_stats,
+            realtimePackets, realtimeBytes, lastRealtimeSequence?.toString() ?: "--")
     }
 
     private fun refreshFileList() {

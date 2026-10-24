@@ -44,6 +44,25 @@
     </LinearLayout>
 
     <Button
+        android:id="@+id/record_realtime_control"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginRight="16dp"
+        android:text="@string/recording_start_realtime" />
+
+    <TextView
+        android:id="@+id/realtime_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginRight="16dp"
+        android:text="@string/recording_realtime_waiting"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body2" />
+
+    <Button
         android:id="@+id/load_file_list"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

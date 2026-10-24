@@ -45,6 +45,7 @@ data class DemoUiState(
     val connectionMessage: String = "",
     val battery: Int? = null,
     val firmwareVersion: String? = null,
+    val countArmed: Boolean? = null,
     val deviceModel: String? = null,
     val syncing: Boolean = false,
     val syncProgress: Int = 0,
@@ -81,6 +82,11 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
                 DevicePushType.POWER -> {
                     val powerBean = data.value as? PowerBean ?: return
                     mainHandler.post { update { it.copy(battery = powerBean.power) } }
+                }
+                DevicePushType.COUNT_CONTROL -> {
+                    val armed = data.value as? Boolean ?: return
+                    Log.e("RWSDK", "Count control push armed=$armed")
+                    mainHandler.post { updateCountControlState(armed) }
                 }
                 DevicePushType.TOUCH_EVENT -> {
                     val event = data.value as? TouchEventBean ?: return
@@ -265,7 +271,7 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
     }
 
     override fun onRingConnecting(device: BleDevice?) {
-        update { it.copy(device = device ?: it.device, connecting = true, connectionMessage = text(R.string.demo_connecting)) }
+        update { it.copy(device = device ?: it.device, countArmed = null, connecting = true, connectionMessage = text(R.string.demo_connecting)) }
     }
 
     override fun onRingConnected(device: BleDevice?) {
@@ -275,7 +281,7 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
             appContext?.let { context -> SavedDeviceStore.save(context, it) }
         }
         update {
-            it.copy(device = connectedDevice, connected = true, ready = false, connecting = true, connectionMessage = text(R.string.demo_initializing))
+            it.copy(device = connectedDevice, countArmed = null, connected = true, ready = false, connecting = true, connectionMessage = text(R.string.demo_initializing))
         }
     }
 
@@ -288,6 +294,7 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
                 syncing = false,
                 syncProgress = 0,
                 activeMeasurement = null,
+                countArmed = null,
                 connectionMessage = if (reason == RingBleError.PASSWORD_AUTH_FAILED) {
                     text(R.string.demo_password_auth_failed)
                 } else {
@@ -295,6 +302,11 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
                 }
             )
         }
+    }
+
+    fun updateCountControlState(armed: Boolean) {
+        if (!state.ready || state.supportMenu?.isSupportCountControl != true) return
+        update { it.copy(countArmed = armed) }
     }
 
     override fun onRingDidFunctionMenu(device: BleDevice?, supportMenuBean: SupportMenuBean) {

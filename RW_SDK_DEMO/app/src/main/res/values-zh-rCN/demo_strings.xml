@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="demo_device_form_screenless_ring">无屏戒指</string>
+    <string name="demo_device_form_screen_ring">有屏戒指</string>
+    <string name="demo_device_form_screenless_bracelet">无屏手链</string>
+    <string name="demo_device_form_screen_bracelet">有屏手链</string>
+    <string name="demo_device_form_screenless_wristband">无屏手环</string>
+    <string name="demo_device_form_screen_wristband">有屏手环</string>
+    <string name="demo_device_form_watch">手表</string>
     <string name="demo_battery_not_charging">未充电</string>
     <string name="demo_battery_charging">充电中</string>
     <string name="demo_battery_full">充满</string>
@@ -95,4 +102,22 @@
     <string name="demo_vibration_continuous">持续：中强度震动</string>
     <string name="demo_vibration_loop">循环：每组3次，中强度，2次/秒，停顿1秒</string>
     <string name="demo_vibration_stop">停止震动</string>
+    <string name="demo_custom_number_display">自定义数字显示</string>
+    <string name="demo_custom_number_desc">显示0～9999数字，持续3秒</string>
+    <string name="demo_custom_number_hint">0～9999</string>
+    <string name="demo_custom_number_show">显示</string>
+    <string name="demo_count_control">计数控制</string>
+    <string name="demo_count_control_desc">获取、开启或关闭；设备推送自动更新状态</string>
+    <string name="demo_count_control_unknown">未获取</string>
+    <string name="demo_count_control_get">获取当前状态</string>
+    <string name="demo_count_control_arm">开启计数识别(Arm)</string>
+    <string name="demo_count_control_disarm">关闭计数识别(Disarm)</string>
+    <string name="demo_count_control_armed">已开启(Arm)</string>
+    <string name="demo_count_control_disarmed">已关闭(Disarm)</string>
+    <string name="recording_start_realtime">开始实时录音</string>
+    <string name="recording_stop_realtime">停止实时录音</string>
+    <string name="recording_realtime_waiting">实时音频：等待接收</string>
+    <string name="recording_realtime_stats">实时音频：%1$d包 · %2$d字节 · 序号%3$s</string>
+    <string name="recording_mode_realtime">模式：实时录音</string>
+    <string name="recording_mode_file">模式：普通录音</string>
 </resources>

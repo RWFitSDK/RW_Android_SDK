@@ -11,6 +11,18 @@ class DeviceAdapter(data : MutableList<BleDevice>) :
     override fun convert(holder: BaseViewHolder, item: BleDevice) {
         holder.setText(R.id.nameTv,item.bleName)
         holder.setText(R.id.macTv,item.bleMac)
+        val deviceFormRes = when (item.deviceForm) {
+            0 -> R.string.demo_device_form_screenless_ring
+            1 -> R.string.demo_device_form_screen_ring
+            2 -> R.string.demo_device_form_screenless_bracelet
+            3 -> R.string.demo_device_form_screen_bracelet
+            4 -> R.string.demo_device_form_screenless_wristband
+            5 -> R.string.demo_device_form_screen_wristband
+            6 -> R.string.demo_device_form_watch
+            else -> null
+        }
+        holder.setText(R.id.deviceFormTv, deviceFormRes?.let { context.getString(it) } ?: "")
+        holder.setGone(R.id.deviceFormTv, deviceFormRes == null)
         val chargingStatus = when (item.batteryStatus) {
             0 -> context.getString(R.string.demo_battery_not_charging)
             1 -> context.getString(R.string.demo_battery_charging)

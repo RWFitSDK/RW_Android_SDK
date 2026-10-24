@@ -145,7 +145,18 @@ public interface ScanDeviceCallback {
 ScanBleService.getService().unRegisterScanBleCallback()
 ```
 
-扫描结果 `BleDevice.getBatteryStatus()` 返回充电状态：`0` 未充电，`1` 充电中，`2` 充满，`-1` 未提供或不支持。此字段不是电量百分比，电量百分比需连接后获取（3.2.1.4）。
+扫描结果 `BleDevice` 主要属性说明：
+
+| BleDevice属性 | 类型 | 说明 |
+| ------------- | ---- | ---- |
+| bleName | String | 设备蓝牙名称 |
+| bleMac | String | 设备蓝牙MAC地址 |
+| bleRssi | int | 扫描时的信号强度，单位dBm |
+| bleDeviceId | String | 设备型号标识，不是设备唯一序列号；未提供时为空 |
+| batteryStatus | int | 充电状态：`0`未充电、`1`充电中、`2`充满；`-1`未提供或不支持，需设备固件支持 |
+| deviceForm | int | 产品形态：`0`无屏戒指、`1`有屏戒指、`2`无屏手链、`3`有屏手链、`4`无屏手环、`5`有屏手环、`6`手表；`-1`未提供或不支持，需设备固件支持 |
+
+> `batteryStatus` 不是电量百分比。电量百分比需连接后获取，见 [3.2.1.4 获取电量](#3214-获取电量)。
 
 ##### 3.1.2 停止搜索
 
@@ -266,6 +277,8 @@ DeviceFuncV2Model类属性定义:
 | isSupportScreenControl      | 是否支持即时屏幕亮灭控制   |
 | isSupportUnitSetting        | 是否支持公制/英制单位设置  |
 | isSupportVibrationControl | 是否支持自定义震动控制 |
+| isSupportCustomNumberDisplay | 是否支持自定义数字显示 |
+| isSupportCountControl | 是否支持计数识别开关与状态查询 |
 
 
 ##### 3.1.7 读取连接态 RSSI
@@ -356,7 +369,7 @@ DHBleSdk.setUserInfo(persionBean)
 
 ##### 3.2.1.3 获取设备信息
 
-> 获取设备型号、固件版本号、屏幕信息和UI版本号.
+> 获取设备型号、固件版本号、屏幕信息、UI版本号和产品形态.
 >
 > 订阅 `FirmwareCallback` 获取结果.
 
@@ -374,6 +387,7 @@ DHBleSdk.setUserInfo(persionBean)
 | screenWidth         | int    | 屏幕宽度                     |
 | screenHeight        | int    | 屏幕高度                     |
 | uiVersion           | String | UI版本号                     |
+| deviceForm          | int    | 产品形态：0无屏戒指、1有屏戒指、2无屏手链、3有屏手链、4无屏手环、5有屏手环、6手表；-1未提供或不支持 |
 
 > **注意:** 升级固件前必须校验设备的 `deviceClazz` 与升级固件对应的设备型号是否一致, 只有型号一致时才能进行升级, 型号不一致时禁止升级.
 
@@ -442,7 +456,7 @@ DHBleSdk.getPowerJL()
 
 支持实时电量推送的设备，会在开始充电或停止充电时主动推送当前电量和充电状态。该能力需设备固件支持，并非固定周期持续上报；如需主动获取当前电量，请调用 `getPowerJL()`。
 
-推送类型为 `DevicePushType.POWER`, `value` 为 `PowerBean`(与 `getPowerJL()` 查询结果同实体)。接入方式见 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听-ondevicepushlistener)。
+推送类型为 `DevicePushType.POWER`, `value` 为 `PowerBean`(与 `getPowerJL()` 查询结果同实体)。接入方式见 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听)。
 
 
 
@@ -593,11 +607,17 @@ DHBleSdk.setRingWearHand(true)
 
 ##### 3.2.1.8 启动与关闭拍照
 
-> APP进入自定义相机页面时开启拍照控制, 开启后设备可通过手势通知APP执行拍照; APP退出相机页面时关闭拍照控制.
+> APP需自行实现相机页面(可使用第三方相机库), 不能直接拉起手机系统相机实现戒指拍照控制. SDK负责相机模式控制与拍照事件通知, 拍照及保存到手机图库由APP完成.
 >
 > 配置表属性: `isTakePhoto`.
 >
 > 订阅 `TakePhotoCallback` 接收设备发出的拍照通知.
+
+使用流程:
+
+1. 进入APP相机页面时, 订阅 `TakePhotoCallback`, 调用 `DHBleSdk.controlTakePhotoJL(1)` 通知戒指进入相机控制模式.
+2. 用户在戒指上触发拍照手势后, `onResult()` 收到 `data=2`; APP调用相机库拍照, 并将照片保存到手机图库.
+3. 退出相机页面时, 调用 `DHBleSdk.controlTakePhotoJL(0)` 通知戒指退出相机控制模式, 并取消订阅.
 
 方法说明:
 
@@ -629,7 +649,7 @@ private val takePhotoCallback = object : TakePhotoCallback {
 
   override fun onResult(data: Int?) {
     if (data == 2) {
-      // 设备发出拍照通知, APP在此执行自定义相机拍照
+      // 调用APP相机库拍照, 并将照片保存到手机图库
     }
   }
 }
@@ -997,7 +1017,7 @@ DHBleSdk.deviceRememberSwitchGet()
 
 **赞念计数实时监听**
 
-用户在设备上按键计数时, 设备会主动上报当前计数。推送类型为 `DevicePushType.MUSLIM_COUNT`, `value` 为 `MuslimCountItemBean`(count/timeMills)。接入方式见 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听-ondevicepushlistener)。
+用户在设备上按键计数时, 设备会主动上报当前计数。推送类型为 `DevicePushType.MUSLIM_COUNT`, `value` 为 `MuslimCountItemBean`(count/timeMills)。接入方式见 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听)。
 
 ##### 3.2.1.16 获取与设置心率/血氧报警配置
 
@@ -1231,7 +1251,7 @@ DHBleSdk.getAlarmVibrationDuration()
 
 
 
-##### 3.2.1.21 设备主动推送监听 OnDevicePushListener
+##### 3.2.1.21 设备主动推送监听
 
 > 设备主动上报的统一监听通道: 电量推送、录音状态推送、赞念计数上报、触摸事件等设备主动事件
 > 都经 `OnDevicePushListener` 分发, 按 `PushData.type` 区分数据。
@@ -1252,6 +1272,8 @@ DevicePushType 类型说明:
 | -------------- | ---------------- | ------------------- | ------------------------------ |
 | POWER          | 电量与充电状态   | PowerBean           | [3.2.1.4.1 实时电量监听](#32141-实时电量监听) |
 | RECORD_STATUS  | 录音状态推送     | RecordStatusBean    | [3.2.5.2 查询录音状态](#3252-查询录音状态)   |
+| RECORD_REALTIME_DATA | 实时录音音频 | RecordRealtimeDataBean | [3.2.5.7 实时录音](#3257-实时录音) |
+| COUNT_CONTROL | 计数识别状态 | Boolean：true开启，false关闭 | [3.2.1.33 计数识别开关与状态查询](#32133-计数识别开关与状态查询) |
 | MUSLIM_COUNT   | 赞念计数实时上报 | MuslimCountItemBean | [3.2.1.15 赞念开关](#32115-获取与设置赞念是否打开) |
 | TOUCH_EVENT    | 触摸/跌落/SOS/连续点击事件 | TouchEventBean | 需固件支持;<br>keyType：1: 触摸按键, 2: 跌落([需开启3.2.1.24](#32124-跌落提醒设置)), 3: SOS, 4: 连续点击。<br>touchType：触摸按键时 1: 单击, 2: 双击, 3: 三击, 4: 长按, 5: 甩动, 6: Release(长按后松手)；跌落时默认1；SOS时不使用；连续点击时表示次数(1-9) |
 
@@ -1381,7 +1403,7 @@ private val factoryTestCallback by lazy {
 
 > 设置或获取跌落提醒开关. 开启后设备检测到跌落时会通过触摸事件通知上报.
 >
-> 跌落事件经 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听-ondevicepushlistener) 的 `TOUCH_EVENT` 接收, 按键类型(keyType)=2 表示跌落事件.
+> 跌落事件经 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听) 的 `TOUCH_EVENT` 接收, 按键类型(keyType)=2 表示跌落事件.
 >
 > 配置表属性: `isSupportFallDetect`
 >
@@ -1872,6 +1894,75 @@ DHBleSdk.controlVibration(3, 2, 0, 0, 0, callback) // 中强度震动3次
 // controlVibration(255, 0, 0, 0, 0, callback) // 停止震动
 ```
 
+##### 3.2.1.32 自定义数字显示
+
+> 将APP指定的数字显示到设备, 显示3秒后退出. 再次调用时更新数字并重新计时3秒, 数字的含义及解读由APP自行处理.
+>
+> 功能配置表属性: `isSupportCustomNumberDisplay`. 仅支持该能力的设备可使用.
+
+方法说明:
+
+`fun showCustomNumber(number: Int, callback: CustomStatusCallback)`
+
+参数说明:
+
+| 参数 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| number | Int | 显示数字, 范围0～9999, 最多4位; 小于0按0处理, 大于9999按9999处理 |
+| callback | CustomStatusCallback | `onSuccess()`：操作成功; `onFail(errorCode)`：操作失败. 结果返回后自动释放, 无需订阅或 `dispose` |
+
+调用示例:
+
+```kotlin
+DHBleSdk.showCustomNumber(627, object : CustomStatusCallback {
+  override fun onSuccess() {
+    Log.e("RWSDK", "custom number display success")
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "custom number display failed, errorCode=$errorCode")
+  }
+})
+```
+
+##### 3.2.1.33 计数识别开关与状态查询
+
+> 功能配置表属性：`isSupportCountControl`。开启或关闭计数识别，不清零累计计数。
+
+```kotlin
+fun setCountControl(armed: Boolean, callback: CustomStatusCallback)
+fun getCountControl(callback: CountControlCallback)
+```
+
+| 参数/回调 | 说明 |
+| --------- | ---- |
+| armed | true：开启(Arm)；false：关闭(Disarm) |
+| CustomStatusCallback | `onSuccess()`设置成功；`onFail(errorCode)`失败 |
+| CountControlCallback | `onResult(Boolean)`返回当前开关状态；`onFail(errorCode)`失败 |
+
+等待上一次操作回调后再进行下一次设置或查询。
+
+设置示例：
+
+```kotlin
+DHBleSdk.setCountControl(true, object : CustomStatusCallback {
+    override fun onSuccess() { Log.e("RWSDK", "counting enabled") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "count control failed=$errorCode") }
+})
+```
+
+查询示例（与设置操作分开调用）：
+
+```kotlin
+DHBleSdk.getCountControl(object : CountControlCallback {
+    override fun onSuccess() = Unit
+    override fun onResult(data: Boolean) { Log.e("RWSDK", "counting enabled=$data") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "get count control failed=$errorCode") }
+})
+```
+
+状态变化通过 `DevicePushType.COUNT_CONTROL` 推送，`value` 为Boolean；实时计数通过 `DevicePushType.MUSLIM_COUNT` 返回 `MuslimCountItemBean`。监听方式见 [3.2.1.21](#32121-设备主动推送监听)。
+
 #### 3.2.2 健康数据同步(实时单次与全天检测)
 
 > 健康数据检测有两种方式: 实时单次检测与全天检测。健康数据包括心率,血氧,压力,HRV,睡眠等, **睡眠无实时检测**。 
@@ -1948,9 +2039,9 @@ DHBleSdk.controlOpen(0, HealthDataType.HEART_RATE.code, object : HealthMeasureme
 
 ##### 3.2.2.2 全天检测-设置健康数据全天监听间隔
 
-> 设置健康数据(心率,血氧,HRV,压力,血糖)全天监听间隔，单位分钟.
+> [!NOTE]
 >
-> **注意事项:暂间隔只有心率可设置30分钟与60分钟, 其它(血氧,HRV,压力,血糖)只能设置开与关; 开始与结束时间固定全天,不可修改.**
+> 监测时段固定为全天（00:00～23:59），各类型的功能支持及推荐间隔见下表。表中间隔为推荐值，其他间隔需设备支持；间隔越短，功耗越高、续航越短。
 
 方法说明: 
 
@@ -1960,24 +2051,34 @@ DHBleSdk.controlOpen(0, HealthDataType.HEART_RATE.code, object : HealthMeasureme
 
 类型说明: 
 
-| HealthMonitorType | 监测项        | 间隔       | 功能表属性                     |
+| HealthMonitorType | 监测项        | 推荐间隔       | 功能表属性                     |
 | ----------------- | ------------- | ---------- | ------------------------------ |
-| HEART_RATE        | 心率          | 30/60分钟  | - |
-| BLOOD_OXYGEN      | 血氧          | 固定60分钟 | isBloodOxy |
-| HRV               | 心率变异性    | 固定60分钟 | isHrv |
-| STRESS            | 压力          | 固定60分钟 | isPressure |
-| BLOOD_SUGAR       | 血糖          | 固定60分钟 | isBloodSugar |
-| BLOOD_PRESSURE    | 血压          | 固定60分钟 | isBloodPress |
+| HEART_RATE        | 心率          | 30/60分钟  | isHr |
+| BLOOD_OXYGEN      | 血氧          | 60分钟     | isBloodOxy |
+| HRV               | 心率变异性    | 60分钟     | isHrv |
+| STRESS            | 压力          | 60分钟     | isPressure |
+| BLOOD_SUGAR       | 血糖          | 60分钟     | isBloodSugar |
+| BLOOD_PRESSURE    | 血压          | 60分钟     | isBloodPress |
 | BODY_TEMPERATURE  | 体温          | 30/60分钟  | isSupportTemperatureMonitoring |
-| PPG               | PPG定时监测   | 30/60分钟  | isSupportPPGMonitoring |
 
 参数说明:
 
-| 参数        | 类型                    | 说明 | 值                                                           |
-| ----------- | ----------------------- | ---- | ------------------------------------------------------------ |
-| type        | HealthMonitorType       | 枚举 | 监测类型, 见类型说明表                                       |
-| monitorBean | HealthMonitorBean       | 类   | isOpen: true开/false关<br>remindDuration: 间隔时间(分钟, 见类型说明表)<br>startHour: 0 固定0不能修改<br>startMin: 0 固定0不能修改<br>endHour: 23 固定23不能修改<br>endMin: 59 固定59不能修改; |
-| callback    | ReminderSettingCallback | 接口 | 设置结果: onSuccess()/onFail();<br>查询结果: onResult(DrinkReminderBean) |
+| 参数        | 类型                    | 说明 |
+| ----------- | ----------------------- | ---- |
+| type        | HealthMonitorType       | 枚举, 监测类型, 见类型说明表 |
+| monitorBean | HealthMonitorBean       | 监测配置, 字段见下表 |
+| callback    | ReminderSettingCallback | 设置结果: onSuccess()/onFail(); 查询结果: onResult(DrinkReminderBean)。回调直接通过方法参数传入, 无需额外订阅或调用 `dispose()` |
+
+HealthMonitorBean 字段说明:
+
+| 字段           | 类型    | 说明 |
+| -------------- | ------- | ---- |
+| isOpen         | boolean | true 开 / false 关 |
+| remindDuration | int     | 监测间隔，单位分钟，推荐值见类型说明表 |
+| startHour      | int     | 固定 0, 不可修改 |
+| startMin       | int     | 固定 0, 不可修改 |
+| endHour        | int     | 固定 23, 不可修改 |
+| endMin         | int     | 固定 59, 不可修改 |
 
 调用示例:
 
@@ -1985,7 +2086,7 @@ DHBleSdk.controlOpen(0, HealthDataType.HEART_RATE.code, object : HealthMeasureme
 // 统一入口: 设置心率监测
 val monitorBean = HealthMonitorBean()
 monitorBean.isOpen = true
-monitorBean.remindDuration = 30 //间隔30分钟(心率/体温可设30或60, 其它固定60)
+monitorBean.remindDuration = 30 // 推荐监测间隔：30分钟
 monitorBean.startHour = 0 //固定
 monitorBean.startMin = 0 //固定
 monitorBean.endHour = 23 //固定
@@ -2003,120 +2104,6 @@ DHBleSdk.getHealthMonitor(HealthMonitorType.BLOOD_OXYGEN, object : ReminderSetti
     override fun onResult(data: DrinkReminderBean?) { /* 当前监听配置 */ }
 })
 ```
-
-###### 3.2.2.2.1 心率检测设置与获取
-
-> 间隔只有心率可设置30分钟与60分钟; 订阅回调: `ReminderSettingCallback`;
->
-> type 固定 `HealthMonitorType.HEART_RATE`
-
-方法说明: 
-
-`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)` 
-
-`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)` 
-
-
-
-###### 3.2.2.2.2 血氧检测设置与获取
-
-> 间隔血氧只可设置60分钟; 订阅回调: `ReminderSettingCallback`;
->
-> 配置表属性: `isBloodOxy` ;
->
-> type 固定 `HealthMonitorType.BLOOD_OXYGEN`
-
-方法说明: 
-
-`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
-
-`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
-
-
-
-###### 3.2.2.2.3 心率变异性(HRV)检测设置与获取
-
-> 间隔HRV只可设置60分钟; 订阅回调: `ReminderSettingCallback`;
->
-> 配置表属性: `isHrv` ;
->
-> type 固定 `HealthMonitorType.HRV`
-
-方法说明: 
-
-`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
-
-`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
-
-
-
-###### 3.2.2.2.4 压力检测设置与获取
-
-> 间隔压力只可设置60分钟; 订阅回调: `ReminderSettingCallback`;
->
-> 配置表属性: `isPressure` ;
->
-> type 固定 `HealthMonitorType.STRESS`
-
-方法说明: 
-
-`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
-
-`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
-
-
-
-###### 3.2.2.2.5 血糖检测设置与获取
-
-> 间隔血糖只可设置60分钟; 订阅回调: `ReminderSettingCallback`;
->
-> 配置表属性: `isBloodSugar` ;
->
-> type 固定 `HealthMonitorType.BLOOD_SUGAR`
-
-方法说明: 
-
-`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
-
-`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
-
-
-
-
-###### 3.2.2.2.6 血压检测设置与获取
-
-> 间隔血压只可设置60分钟; 订阅回调: `ReminderSettingCallback`;
->
-> 配置表属性: `isBloodPress` ;
->
-> type 固定 `HealthMonitorType.BLOOD_PRESSURE`
-
-方法说明: 
-
-`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
-
-`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
-
-
-
-
-###### 3.2.2.2.7 体温检测设置与获取
-
-> 间隔体温可设置30分钟与60分钟; 订阅回调: `ReminderSettingCallback`;
->
-> 配置表属性: `isSupportTemperatureMonitoring`
->
-> type 固定 `HealthMonitorType.BODY_TEMPERATURE`
-
-方法说明: 
-
-`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)`
-
-`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)`
-
-
-
-
 
 ##### 3.2.2.3 全天检测-同步健康历史数据
 
@@ -2719,7 +2706,7 @@ private val sportResult3Callback by lazy {
 
 
 
-#### 3.2.5 录音功能
+#### 3.2.5 AI录音功能
 
 > 智能录音戒指的录音控制、状态查询与录音文件管理(文件列表/下载/删除/格式化);
 >
@@ -2791,6 +2778,7 @@ DHBleSdk.recordControl(true, object : RecordControlCallback {
 | duration             | long    |      | 已录音时长, 单位秒(s), 仅录音中返回; |
 | totalCapacity        | long    |      | 录音区总容量, 单位字节(B);         |
 | remainingCapacity    | long    |      | 录音区剩余容量, 单位字节(B);       |
+| realtime             | Boolean |      | true：实时录音；false：非实时录音 |
 
 调用示例:
 
@@ -2807,7 +2795,7 @@ DHBleSdk.getRecordStatus(object : RecordStatusCallback {
 })
 ```
 
-录音状态实时推送: 推送类型为 `DevicePushType.RECORD_STATUS`, `value` 为 `RecordStatusBean`(isRecording/status/startTime/duration/容量)。接入方式见 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听-ondevicepushlistener)。
+录音状态实时推送: 推送类型为 `DevicePushType.RECORD_STATUS`, `value` 为 `RecordStatusBean`(isRecording/status/startTime/duration/容量)。接入方式见 [3.2.1.21 设备主动推送监听](#32121-设备主动推送监听)。
 
 ##### 3.2.5.3 获取录音文件列表
 
@@ -2980,6 +2968,47 @@ DHBleSdk.formatRecordStorage(object : RecordFormatCallback {
     }
 })
 ```
+
+##### 3.2.5.7 实时录音
+
+> 功能配置表属性：`isSupportRecording`，需设备固件支持实时录音。
+
+`fun recordRealtimeControl(start: Boolean, callback: RecordControlCallback)`
+
+| 参数/回调 | 说明 |
+| --------- | ---- |
+| start | `true`：启动实时录音；`false`：停止 |
+| callback | `onResult(Int)`返回操作后的录音状态(1录音中、0空闲)，`onFail(errorCode)`返回失败；音频不通过此回调返回 |
+
+实时音频通过 `OnDevicePushListener` 的 `DevicePushType.RECORD_REALTIME_DATA` 接收，`value` 为 `RecordRealtimeDataBean`：
+
+| 属性 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| sequence | Int | 数据包序号0～255，255后回到0，可用于检查丢包和顺序 |
+| audioData | ByteArray | 当前包的音频数据（原始 Opus 压缩数据） |
+
+```kotlin
+val recordingListener = object : OnDevicePushListener {
+    override fun onPush(data: PushData) {
+        if (data.type != DevicePushType.RECORD_REALTIME_DATA) return
+        val packet = data.value as? RecordRealtimeDataBean ?: return
+        // 按到达顺序处理packet.audioData；不要在此回调中执行耗时操作。
+        Log.e("RWSDK", "audio sequence=${packet.sequence}, size=${packet.audioData.size}")
+    }
+}
+DHBleSdk.addOnDevicePushListener(recordingListener)
+
+val controlCallback = object : RecordControlCallback {
+    override fun onSuccess() = Unit
+    override fun onResult(data: Int) { Log.e("RWSDK", "recording state=$data") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "record control failed=$errorCode") }
+}
+DHBleSdk.recordRealtimeControl(true, controlCallback)
+// 停止时调用：DHBleSdk.recordRealtimeControl(false, controlCallback)
+// 页面退出或不再使用时：DHBleSdk.removeOnDevicePushListener(recordingListener)
+```
+
+先注册监听再启动。录音状态仍通过 `RECORD_STATUS` 推送或 `getRecordStatus()` 查询，`realtime` 表示当前是否为实时方式。
 
 #### 5.2.5 传感器原始数据
 
@@ -3228,6 +3257,12 @@ fun unregisterSleepRawDataCallback() {
    
 
 ## SDK修订记录
+
+**v2.0.0_20261022** (2026.10.22)
+
+- 新增实时录音控制接口 `recordRealtimeControl` 及实时音频监听(3.2.5.7)
+- 新增计数识别开关、状态查询及主动推送(3.2.1.33)，功能表新增 `isSupportCountControl`
+- 扫描结果与设备版本信息新增产品形态 `deviceForm`(3.1.1、3.2.1.3)
 
 **v2.0.0_20261012** (2026.10.12)
 

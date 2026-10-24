@@ -14,6 +14,7 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.dhouse.dhsdk_v2.R
 import com.dhouse.dhsdk_v2.databinding.FragmentDeviceBinding
+import com.dhouse.dhsdk_v2.databinding.DialogCustomNumberBinding
 import com.dhouse.dhsdk_v2.demo.*
 import com.dhouse.dhsdk_v2.XXApplication
 import com.dhouse.dhsdk_v2.ui.ScanActivity
@@ -25,6 +26,7 @@ import com.example.blesdk.callback.data.*
 import com.example.blesdk.blering.HealthMonitorType
 import com.example.blesdk.callback.status.CustomStatusCallback
 import com.example.blesdk.utils.Constants
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import java.io.File
 
 class DeviceFragment : Fragment() {
@@ -36,6 +38,7 @@ class DeviceFragment : Fragment() {
     private var pendingSensorRawAction: Int? = null
     private var sensorHistoryCallback: SensorHistoryRawCallback? = null
     private var sensorHistoryLoadingDialog: AlertDialog? = null
+    private var customNumberDialog: BottomSheetDialog? = null
 
     private val sensorRawControlCallback = object : SensorRawControlCallback {
         override fun onResult(data: Int?) {
@@ -90,6 +93,8 @@ class DeviceFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        customNumberDialog?.dismiss()
+        customNumberDialog = null
         DHBleSdk.dispose(sensorRawControlCallback)
         sensorHistoryCallback?.let(DHBleSdk::dispose)
         sensorHistoryCallback = null
@@ -119,7 +124,10 @@ class DeviceFragment : Fragment() {
         binding.readRssi.isEnabled = state.ready
         binding.searchDevice.text = getString(if (device == null) R.string.demo_search_device else R.string.demo_unbind_device)
         val settings = buildDeviceSettings(requireContext(), state.supportMenu).map { item ->
-            settingValues[item.id]?.let { item.copy(valueText = it) } ?: item
+            if (item.id == "count_control") {
+                item.copy(valueText = state.countArmed?.let(::countControlStateText)
+                    ?: getString(R.string.demo_count_control_unknown))
+            } else settingValues[item.id]?.let { item.copy(valueText = it) } ?: item
         }
         adapter.submit(settings)
         binding.emptySettings.visibility = if (settings.isEmpty()) View.VISIBLE else View.GONE
@@ -175,6 +183,7 @@ class DeviceFragment : Fragment() {
                 DHBleSdk.setBrightScreenTimeJL(BrightScreenTimeBean().apply { timeSecond = seconds })
             }
             "screen_control" -> showScreenControlActions(item.id)
+            "custom_number_display" -> showCustomNumberInput(item.id)
             "raise_to_wake" -> editTimeRange(getString(R.string.demo_raise_to_wake), 8, 0, 20, 0) { enabled, sh, sm, eh, em ->
                 val callback = object : BrightCallback {
                     override fun onResult(data: BrightScreenBean?) = Unit
@@ -290,6 +299,7 @@ class DeviceFragment : Fragment() {
                 DHBleSdk.subscribeData(callback)
                 DHBleSdk.setVibrationInterval(interval)
             }
+            "count_control" -> showCountControl()
             "remember_switch" -> choose(getString(R.string.demo_tasbeeh_switch), onOffLabels()) { index ->
                 val callback = object : MuslimCountSwitchCallback {
                     override fun onResult(data: Int?) = Unit
@@ -719,6 +729,94 @@ class DeviceFragment : Fragment() {
         }
         DHBleSdk.subscribeData(callback)
         DHBleSdk.deviceSetBoAlertCmd(enabled, value)
+    }
+
+    private fun showCustomNumberInput(settingId: String) {
+        customNumberDialog?.dismiss()
+        val form = DialogCustomNumberBinding.inflate(layoutInflater)
+        val dialog = BottomSheetDialog(requireContext())
+        customNumberDialog = dialog
+        form.numberInput.setText((settingValues[settingId]?.toIntOrNull() ?: 627).toString())
+        form.cancel.setOnClickListener { dialog.dismiss() }
+        form.confirm.setOnClickListener {
+            val number = (form.numberInput.text.toString().toIntOrNull() ?: 0).coerceIn(0, 9999)
+            dialog.dismiss()
+            DHBleSdk.showCustomNumber(number, object : CustomStatusCallback {
+                override fun onSuccess() {
+                    Log.e("RWSDK", "showCustomNumber success number=$number")
+                    if (_binding == null || !isAdded) return
+                    updateSettingValue(settingId, number.toString())
+                    toast(getString(R.string.demo_setting_success))
+                }
+
+                override fun onFail(errorCode: Int) {
+                    Log.e("RWSDK", "showCustomNumber failed number=$number errorCode=$errorCode")
+                    if (_binding == null || !isAdded) return
+                    toast(getString(R.string.demo_setting_failed, errorCode))
+                }
+            })
+        }
+        dialog.setContentView(form.root)
+        dialog.setOnDismissListener {
+            if (customNumberDialog === dialog) customNumberDialog = null
+        }
+        dialog.show()
+    }
+
+    private fun countControlStateText(armed: Boolean) = getString(
+        if (armed) R.string.demo_count_control_armed else R.string.demo_count_control_disarmed)
+
+    private fun showCountControl() {
+        choose(getString(R.string.demo_count_control), arrayOf(
+            getString(R.string.demo_count_control_get),
+            getString(R.string.demo_count_control_arm),
+            getString(R.string.demo_count_control_disarm)
+        )) { index ->
+            if (index == 0) {
+                getCountControl()
+            } else {
+                val armed = index == 1
+                val mac = DemoStateStore.state.device?.bleMac
+                Log.e("RWSDK", "setCountControl request armed=$armed")
+                DHBleSdk.setCountControl(armed, object : CustomStatusCallback {
+                    override fun onSuccess() {
+                        Log.e("RWSDK", "setCountControl success armed=$armed")
+                        if (!isCountControlTarget(mac)) return
+                        toast(getString(R.string.demo_setting_success))
+                        // 设置结果返回后查询实际状态；主动推送也会独立更新此item。
+                        getCountControl()
+                    }
+
+                    override fun onFail(errorCode: Int) {
+                        Log.e("RWSDK", "setCountControl failed errorCode=$errorCode")
+                        if (isCountControlTarget(mac)) toast(getString(R.string.demo_setting_failed, errorCode))
+                    }
+                })
+            }
+        }
+    }
+
+    private fun isCountControlTarget(mac: String?) = _binding != null && isAdded &&
+        DemoStateStore.state.ready && DemoStateStore.state.device?.bleMac == mac
+
+    private fun getCountControl() {
+        val mac = DemoStateStore.state.device?.bleMac
+        Log.e("RWSDK", "getCountControl request")
+        DHBleSdk.getCountControl(object : CountControlCallback {
+            override fun onResult(data: Boolean?) {
+                Log.e("RWSDK", "getCountControl result armed=$data")
+                if (data == null || !isCountControlTarget(mac)) return
+                DemoStateStore.updateCountControlState(data)
+                toast(countControlStateText(data))
+            }
+
+            override fun onSuccess() = Unit
+
+            override fun onFail(errorCode: Int) {
+                Log.e("RWSDK", "getCountControl failed errorCode=$errorCode")
+                if (isCountControlTarget(mac)) toast(getString(R.string.demo_setting_failed, errorCode))
+            }
+        })
     }
 
     private fun showVibrationControl() {

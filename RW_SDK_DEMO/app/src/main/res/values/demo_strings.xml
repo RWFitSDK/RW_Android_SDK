@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="demo_device_form_screenless_ring">Ring without a screen</string>
+    <string name="demo_device_form_screen_ring">Ring with a screen</string>
+    <string name="demo_device_form_screenless_bracelet">Bracelet without a screen</string>
+    <string name="demo_device_form_screen_bracelet">Bracelet with a screen</string>
+    <string name="demo_device_form_screenless_wristband">Wristband without a screen</string>
+    <string name="demo_device_form_screen_wristband">Wristband with a screen</string>
+    <string name="demo_device_form_watch">Watch</string>
     <string name="demo_battery_not_charging">Not charging</string>
     <string name="demo_battery_charging">Charging</string>
     <string name="demo_battery_full">Fully charged</string>
@@ -255,4 +262,22 @@
     <string name="demo_vibration_continuous">Continuous: medium strength</string>
     <string name="demo_vibration_loop">Loop: 3 medium pulses, 2/s, 1 s pause</string>
     <string name="demo_vibration_stop">Stop vibration</string>
+    <string name="demo_custom_number_display">Custom number display</string>
+    <string name="demo_custom_number_desc">Show a number from 0–9999 for 3 seconds</string>
+    <string name="demo_custom_number_hint">0–9999</string>
+    <string name="demo_custom_number_show">Show</string>
+    <string name="demo_count_control">Counting recognition</string>
+    <string name="demo_count_control_desc">Read, enable or disable; state updates from device pushes</string>
+    <string name="demo_count_control_unknown">Not read</string>
+    <string name="demo_count_control_get">Read current state</string>
+    <string name="demo_count_control_arm">Enable (Arm)</string>
+    <string name="demo_count_control_disarm">Disable (Disarm)</string>
+    <string name="demo_count_control_armed">Enabled (Arm)</string>
+    <string name="demo_count_control_disarmed">Disabled (Disarm)</string>
+    <string name="recording_start_realtime">Start real-time recording</string>
+    <string name="recording_stop_realtime">Stop real-time recording</string>
+    <string name="recording_realtime_waiting">Real-time audio: waiting</string>
+    <string name="recording_realtime_stats">Real-time audio: %1$d packets · %2$d bytes · sequence %3$s</string>
+    <string name="recording_mode_realtime">Mode: real-time recording</string>
+    <string name="recording_mode_file">Mode: file recording</string>
 </resources>

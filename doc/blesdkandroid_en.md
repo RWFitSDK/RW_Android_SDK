@@ -149,7 +149,18 @@ public interface ScanDeviceCallback {
 ScanBleService.getService().unRegisterScanBleCallback()
 ```
 
-`BleDevice.getBatteryStatus()` returns the charging status: `0` not charging, `1` charging, `2` full, or `-1` unavailable or unsupported. This is not a battery percentage; read the battery level after connecting (3.2.1.4).
+Main properties of the `BleDevice` scan result:
+
+| BleDevice property | Type | Description |
+| ------------------ | ---- | ----------- |
+| bleName | String | Device Bluetooth name |
+| bleMac | String | Device Bluetooth MAC address |
+| bleRssi | int | Signal strength at scan time, in dBm |
+| bleDeviceId | String | Device model identifier, not a unique device serial number; empty if unavailable |
+| batteryStatus | int | Charging status: `0` not charging, `1` charging, `2` full; `-1` unavailable or unsupported. Requires device firmware support |
+| deviceForm | int | Product form: `0` ring without a screen, `1` ring with a screen, `2` bracelet without a screen, `3` bracelet with a screen, `4` wristband without a screen, `5` wristband with a screen, `6` watch; `-1` unavailable or unsupported. Requires device firmware support |
+
+> `batteryStatus` is not a battery percentage. Read the battery level after connecting; see [3.2.1.4 Get Battery Level](#3214-get-battery-level).
 
 ##### 3.1.2 Stop searching
 
@@ -272,6 +283,8 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportScreenControl      | Does it support instant screen on/off control?                |
 | isSupportUnitSetting        | Does it support metric/imperial unit settings?                |
 | isSupportVibrationControl | Supports custom vibration control |
+| isSupportCustomNumberDisplay | Supports custom number display |
+| isSupportCountControl | Supports counting recognition control and state queries |
 
 
 ##### 3.1.7 Read connected RSSI
@@ -358,7 +371,7 @@ DHBleSdk.setUserInfo(persionBean)
 
 ##### 3.2.1.3 Get Device Information
 
-> Get the device model, firmware version, screen information, and UI version.
+> Get the device model, firmware version, screen information, UI version, and product form.
 >
 > Subscribe to `FirmwareCallback` to receive the result.
 
@@ -376,6 +389,7 @@ Return Value:
 | screenWidth              | int    | Screen width                                     |
 | screenHeight             | int    | Screen height                                    |
 | uiVersion                | String | UI version                                       |
+| deviceForm               | int    | Product form: 0 ring without a screen, 1 ring with a screen, 2 bracelet without a screen, 3 bracelet with a screen, 4 wristband without a screen, 5 wristband with a screen, 6 watch; -1 unavailable or unsupported |
 
 > **Important:** Before a firmware upgrade, verify that the device's `deviceClazz` matches the device model supported by the firmware package. Proceed with the upgrade only when they match. Do not upgrade if they do not match.
 
@@ -442,7 +456,7 @@ DHBleSdk.getPowerJL()
 
 Supported devices actively push the current battery level and charging status when charging starts or stops. This capability requires device firmware support and is not a periodic update. Call `getPowerJL()` when the app needs to actively query the current battery level.
 
-The push type is `DevicePushType.POWER` and `value` is a `PowerBean` (same entity as the `getPowerJL()` query result). See [3.2.1.21 Device Push Notification](#32121-device-push-notification-ondevicepushlistener) for how to subscribe.
+The push type is `DevicePushType.POWER` and `value` is a `PowerBean` (same entity as the `getPowerJL()` query result). See [3.2.1.21 Device Push Notification](#32121-device-push-notification) for how to subscribe.
 
 ##### 3.2.1.5 Getting and Setting Video Control Switch
 
@@ -587,11 +601,17 @@ DHBleSdk.setRingWearHand(true)
 
 ##### 3.2.1.8 Start and Stop Photo Taking
 
-> Enable photo control when the APP enters its custom camera page. Once enabled, the device can notify the APP through gestures to take a photo. Disable photo control when the APP exits the camera page.
+> The APP must implement its own camera page, for example with a third-party camera library. Launching the phone's system camera does not provide ring-controlled capture. The SDK controls the camera mode and delivers capture events; the APP takes photos and saves them to the phone's gallery.
 >
 > Function table property: `isTakePhoto`.
 >
 > Subscribe to `TakePhotoCallback` to receive photo notifications from the device.
+
+Usage flow:
+
+1. When entering the APP's camera page, subscribe to `TakePhotoCallback` and call `DHBleSdk.controlTakePhotoJL(1)` to put the ring into camera control mode.
+2. When the user triggers a capture gesture on the ring, `onResult()` receives `data=2`. Use the camera library to take a photo and save it to the phone's gallery.
+3. When leaving the camera page, call `DHBleSdk.controlTakePhotoJL(0)` to exit camera control mode and unsubscribe.
 
 Method Description:
 
@@ -623,7 +643,7 @@ private val takePhotoCallback = object : TakePhotoCallback {
 
   override fun onResult(data: Int?) {
     if (data == 2) {
-      // The device sends a photo notification. Take a photo here using the APP's custom camera.
+      // Use the APP's camera library to take a photo and save it to the phone's gallery.
     }
   }
 }
@@ -985,7 +1005,7 @@ DHBleSdk.deviceRememberSwitchGet()
 
 **Muslim Count Real-time Monitoring**
 
-When the user taps the counter on the device, the device actively reports the current count. The push type is `DevicePushType.MUSLIM_COUNT` and `value` is a `MuslimCountItemBean` (count/timeMills). See [3.2.1.21 Device Push Notification](#32121-device-push-notification-ondevicepushlistener) for how to subscribe.
+When the user taps the counter on the device, the device actively reports the current count. The push type is `DevicePushType.MUSLIM_COUNT` and `value` is a `MuslimCountItemBean` (count/timeMills). See [3.2.1.21 Device Push Notification](#32121-device-push-notification) for how to subscribe.
 
 ##### 3.2.1.16 Getting and Setting Heart Rate/Blood Oxygen Alarm Configuration
 
@@ -1207,7 +1227,7 @@ DHBleSdk.getAlarmVibrationDuration()
 
 
 
-##### 3.2.1.21 Device Push Notification OnDevicePushListener
+##### 3.2.1.21 Device Push Notification
 
 > The unified channel for device-initiated reports: device events such as battery push, recording status push, Muslim count reporting and touch events are all dispatched through `OnDevicePushListener`, distinguished by `PushData.type`.
 >
@@ -1227,6 +1247,8 @@ DevicePushType description:
 | -------------- | --------------------------- | ------------------- | ----------------------------------------------- |
 | POWER          | Battery and charging status | PowerBean           | [3.2.1.4.1 Real-time Battery Monitoring](#32141-real-time-battery-monitoring) |
 | RECORD_STATUS  | Recording status push       | RecordStatusBean    | [3.2.5.2 Query Recording Status](#3252-query-recording-status) |
+| RECORD_REALTIME_DATA | Real-time recording audio | RecordRealtimeDataBean | [3.2.5.7 Real-time Recording](#3257-real-time-recording) |
+| COUNT_CONTROL | Counting recognition state | Boolean: true enabled, false disabled | [3.2.1.33 Counting Recognition Control and State Queries](#32133-counting-recognition-control-and-state-queries) |
 | MUSLIM_COUNT   | Muslim count real-time report | MuslimCountItemBean | [3.2.1.15 Reminder Function](#32115-getting-and-setting-whether-the-reminder-function-is-enabled) |
 | TOUCH_EVENT    | Touch / fall / SOS / repeated taps | TouchEventBean | Requires firmware support.<br>keyType: 1: touch key, 2: fall ([requires enabling 3.2.1.24](#32124-fall-detection-setting)), 3: SOS, 4: repeated taps.<br>touchType: for touch keys, 1: single tap, 2: double tap, 3: triple tap, 4: long press, 5: shake, 6: Release after a long press; defaults to 1 for fall; unused for SOS; contains the tap count (1-9) for repeated taps |
 
@@ -1356,7 +1378,7 @@ private val factoryTestCallback by lazy {
 
 > Set or get the fall detection switch. When enabled, the device reports through the touch event notification when a fall is detected.
 >
-> Fall events are received via the `TOUCH_EVENT` type of [3.2.1.21 Device Push Notification](#32121-device-push-notification-ondevicepushlistener); keyType=2 indicates a fall event.
+> Fall events are received via the `TOUCH_EVENT` type of [3.2.1.21 Device Push Notification](#32121-device-push-notification); keyType=2 indicates a fall event.
 >
 > Configuration table attribute: `isSupportFallDetect`
 >
@@ -1847,6 +1869,75 @@ DHBleSdk.controlVibration(3, 2, 0, 0, 0, callback) // Three medium pulses
 // controlVibration(255, 0, 0, 0, 0, callback) // Stop
 ```
 
+##### 3.2.1.32 Custom Number Display
+
+> Displays an APP-specified number on the device for 3 seconds. Calling the method again updates the number and restarts the 3-second display period. The APP defines the meaning and interpretation of the number.
+>
+> Function configuration property: `isSupportCustomNumberDisplay`. Only devices supporting this capability can use this feature.
+
+Method Description:
+
+`fun showCustomNumber(number: Int, callback: CustomStatusCallback)`
+
+Parameter Description:
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| number | Int | Number to display, 0–9999, up to 4 digits. Values below 0 are treated as 0; values above 9999 are treated as 9999. |
+| callback | CustomStatusCallback | `onSuccess()`: operation succeeded; `onFail(errorCode)`: operation failed. Automatically released after the result; no subscription or `dispose` is required. |
+
+Example of usage:
+
+```kotlin
+DHBleSdk.showCustomNumber(627, object : CustomStatusCallback {
+  override fun onSuccess() {
+    Log.e("RWSDK", "custom number display success")
+  }
+
+  override fun onFail(errorCode: Int) {
+    Log.e("RWSDK", "custom number display failed, errorCode=$errorCode")
+  }
+})
+```
+
+##### 3.2.1.33 Counting Recognition Control and State Queries
+
+> Requires `isSupportCountControl`. Enabling or disabling recognition does not clear the accumulated count.
+
+```kotlin
+fun setCountControl(armed: Boolean, callback: CustomStatusCallback)
+fun getCountControl(callback: CountControlCallback)
+```
+
+| Parameter / callback | Description |
+| -------------------- | ----------- |
+| armed | true: enabled (Arm); false: disabled (Disarm) |
+| CustomStatusCallback | `onSuccess()` on successful settings; `onFail(errorCode)` on failure |
+| CountControlCallback | `onResult(Boolean)` returns the current state; `onFail(errorCode)` on failure |
+
+Wait for the previous operation's callback before issuing another set or query.
+
+Setting example:
+
+```kotlin
+DHBleSdk.setCountControl(true, object : CustomStatusCallback {
+    override fun onSuccess() { Log.e("RWSDK", "counting enabled") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "count control failed=$errorCode") }
+})
+```
+
+Query example (call separately from the setting operation):
+
+```kotlin
+DHBleSdk.getCountControl(object : CountControlCallback {
+    override fun onSuccess() = Unit
+    override fun onResult(data: Boolean) { Log.e("RWSDK", "counting enabled=$data") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "get count control failed=$errorCode") }
+})
+```
+
+State changes arrive as `DevicePushType.COUNT_CONTROL`, with a Boolean `value`. Real-time counts arrive as `DevicePushType.MUSLIM_COUNT`, with a `MuslimCountItemBean`. See [3.2.1.21](#32121-device-push-notification) for listener registration.
+
 #### 3.2.2 Health Data Synchronization (Real-time Single Measurement and All-day Monitoring)
 
 > There are two ways to detect health data: real-time single measurement and all-day monitoring. Health data includes heart rate, blood oxygen, stress, HRV, sleep, etc. **Sleep data does not have real-time measurement.**
@@ -1923,15 +2014,13 @@ DHBleSdk.controlOpen(0, HealthDataType.HEART_RATE.code, object : HealthMeasureme
 
 ##### 3.2.2.2 Continuous monitoring - Set the interval for continuous monitoring of health data.
 
-> **Note: currently only heart rate supports 30/60-minute intervals; others (blood oxygen, HRV, pressure, blood glucose) only support on/off; the start and end time is fixed to all day and cannot be modified.**
-
-###### Unified Entry (recommended): setHealthMonitor / getHealthMonitor
-
-> Distinguishes all continuous monitoring items (heart rate/blood oxygen/HRV/pressure/blood glucose/blood pressure/temperature/PPG) with a single `HealthMonitorType` parameter;
+> [!NOTE]
 >
-> Callback: `ReminderSettingCallback`;
+> The monitoring period is fixed to all day (00:00–23:59). See the table below for each type's required capability and recommended intervals. These intervals are recommended values; other intervals require device support. Shorter intervals increase power consumption and shorten battery life between charges.
+
+> All continuous monitoring items (heart rate/blood oxygen/HRV/pressure/blood glucose/blood pressure/temperature) are distinguished by a single `HealthMonitorType` parameter;
 >
-> Entity: `HealthMonitorBean`;
+> Callback: `ReminderSettingCallback`; Entity: `HealthMonitorBean`.
 
 Method Description:
 
@@ -1941,24 +2030,34 @@ Method Description:
 
 Type description:
 
-| HealthMonitorType | Item            | Interval       | Configuration table attribute                    |
+| HealthMonitorType | Item            | Recommended interval | Configuration table attribute                    |
 | ----------------- | --------------- | -------------- | ------------------------------------------------ |
-| HEART_RATE        | Heart rate      | 30/60 minutes  | -                                                |
-| BLOOD_OXYGEN      | Blood oxygen    | Fixed 60 min   | isBloodOxy                                       |
-| HRV               | HRV             | Fixed 60 min   | isHrv                                            |
-| STRESS            | Pressure        | Fixed 60 min   | isPressure                                       |
-| BLOOD_SUGAR       | Blood glucose   | Fixed 60 min   | isBloodSugar                                     |
-| BLOOD_PRESSURE    | Blood pressure  | Fixed 60 min   | isBloodPress                                     |
+| HEART_RATE        | Heart rate      | 30/60 minutes  | isHr                                             |
+| BLOOD_OXYGEN      | Blood oxygen    | 60 minutes     | isBloodOxy                                       |
+| HRV               | HRV             | 60 minutes     | isHrv                                            |
+| STRESS            | Pressure        | 60 minutes     | isPressure                                       |
+| BLOOD_SUGAR       | Blood glucose   | 60 minutes     | isBloodSugar                                     |
+| BLOOD_PRESSURE    | Blood pressure  | 60 minutes     | isBloodPress                                     |
 | BODY_TEMPERATURE  | Temperature     | 30/60 minutes  | isSupportTemperatureMonitoring                   |
-| PPG               | PPG monitoring  | 30/60 minutes  | isSupportPPGMonitoring                           |
 
 Parameter Description:
 
-| Parameter    | Type                    | Description | Value                                                           |
-| ------------ | ----------------------- | ----------- | --------------------------------------------------------------- |
-| type         | HealthMonitorType       | Enum        | Monitoring type, see the type table above                       |
-| monitorBean  | HealthMonitorBean       | Entity      | isOpen: true on/false off<br>remindDuration: interval in minutes (see the type table)<br>startHour: 0 fixed<br>startMin: 0 fixed<br>endHour: 23 fixed<br>endMin: 59 fixed; |
-| callback     | ReminderSettingCallback | Interface   | Set result: onSuccess()/onFail();<br>Query result: onResult(DrinkReminderBean); |
+| Parameter    | Type                    | Description |
+| ------------ | ----------------------- | ----------- |
+| type         | HealthMonitorType       | Enum, monitoring type, see the type table above |
+| monitorBean  | HealthMonitorBean       | Monitoring configuration, fields listed below |
+| callback     | ReminderSettingCallback | Set result: onSuccess()/onFail(); Query result: onResult(DrinkReminderBean). The callback is passed directly as a method parameter; no extra subscription or `dispose()` call is needed. |
+
+HealthMonitorBean fields:
+
+| Field         | Type    | Description |
+| ------------- | ------- | ----------- |
+| isOpen        | boolean | true on / false off |
+| remindDuration | int    | Monitoring interval in minutes; see the type table for recommended values |
+| startHour     | int     | Fixed 0, cannot be modified |
+| startMin      | int     | Fixed 0, cannot be modified |
+| endHour       | int     | Fixed 23, cannot be modified |
+| endMin        | int     | Fixed 59, cannot be modified |
 
 Example of usage:
 
@@ -1966,7 +2065,7 @@ Example of usage:
 //Unified entry: set heart rate monitoring
 val monitorBean = HealthMonitorBean()
 monitorBean.isOpen = true
-monitorBean.remindDuration = 30 //30-minute interval (heart rate/temperature support 30 or 60, others fixed 60)
+monitorBean.remindDuration = 30 // Recommended monitoring interval: 30 minutes
 monitorBean.startHour = 0 //fixed
 monitorBean.startMin = 0 //fixed
 monitorBean.endHour = 23 //fixed
@@ -1984,66 +2083,6 @@ DHBleSdk.getHealthMonitor(HealthMonitorType.BLOOD_OXYGEN, object : ReminderSetti
     override fun onResult(data: DrinkReminderBean?) { /* current configuration */ }
 })
 ```
-
-###### 3.2.2.2.1 Heart Rate Detection Setting and Getting
-
-> Only heart rate supports 30/60-minute intervals;
->
-> type is fixed `HealthMonitorType.HEART_RATE`
-
-Method Description:
-
-`fun setHealthMonitor(type: HealthMonitorType, monitorBean: HealthMonitorBean, callback: ReminderSettingCallback)` — type is fixed `HealthMonitorType.HEART_RATE`
-
-`fun getHealthMonitor(type: HealthMonitorType, callback: ReminderSettingCallback)` — type is fixed `HealthMonitorType.HEART_RATE`
-
-###### 3.2.2.2.2 Blood Oxygen Detection Setting and Getting
-
-> The blood oxygen interval is fixed at 60 minutes;
->
-> Configuration table attribute: `isBloodOxy` ;
->
-> type is fixed `HealthMonitorType.BLOOD_OXYGEN`
-
-###### 3.2.2.2.3 Heart Rate Variability (HRV) Detection Setting and Getting
-
-> The HRV interval is fixed at 60 minutes;
->
-> Configuration table attribute: `isHrv` ;
->
-> type is fixed `HealthMonitorType.HRV`
-
-###### 3.2.2.2.4 Pressure Detection Setting and Getting
-
-> The pressure interval is fixed at 60 minutes;
->
-> Configuration table attribute: `isPressure` ;
->
-> type is fixed `HealthMonitorType.STRESS`
-
-###### 3.2.2.2.5 Blood Glucose Detection Setting and Getting
-
-> The blood glucose interval is fixed at 60 minutes;
->
-> Configuration table attribute: `isBloodSugar` ;
->
-> type is fixed `HealthMonitorType.BLOOD_SUGAR`
-
-###### 3.2.2.2.6 Blood Pressure Detection Setting and Getting
-
-> The blood pressure interval is fixed at 60 minutes;
->
-> Configuration table attribute: `isBloodPress` ;
->
-> type is fixed `HealthMonitorType.BLOOD_PRESSURE`
-
-###### 3.2.2.2.7 Temperature Detection Setting and Getting
-
-> The temperature interval supports 30 and 60 minutes;
->
-> Configuration table attribute: `isSupportTemperatureMonitoring`
->
-> type is fixed `HealthMonitorType.BODY_TEMPERATURE`
 
 ##### 3.2.2.3 All-day Monitoring - Synchronize Health History Data
 
@@ -2631,7 +2670,7 @@ private val sportResult3Callback by lazy {
 
 
 
-#### 3.2.5 Recording
+#### 3.2.5 AI Recording
 
 > Recording control, status query and recording file management (list/download/delete/format) for smart recording rings;
 >
@@ -2701,6 +2740,7 @@ RecordStatusBean parameters:
 | duration         | long    |             | Recorded duration, in seconds (s), only while recording; |
 | totalCapacity    | long    |             | Total recording storage capacity, in bytes (B);    |
 | remainingCapacity | long  |             | Remaining recording storage capacity, in bytes (B); |
+| realtime | Boolean | | true: real-time recording; false: non-real-time recording |
 
 Example of usage:
 
@@ -2717,7 +2757,7 @@ DHBleSdk.getRecordStatus(object : RecordStatusCallback {
 })
 ```
 
-Recording status real-time push: the push type is `DevicePushType.RECORD_STATUS` and `value` is a `RecordStatusBean` (isRecording/status/startTime/duration/capacity). See [3.2.1.21 Device Push Notification](#32121-device-push-notification-ondevicepushlistener) for how to subscribe.
+Recording status real-time push: the push type is `DevicePushType.RECORD_STATUS` and `value` is a `RecordStatusBean` (isRecording/status/startTime/duration/capacity). See [3.2.1.21 Device Push Notification](#32121-device-push-notification) for how to subscribe.
 
 ##### 3.2.5.3 Get Recording File List
 
@@ -2890,6 +2930,47 @@ DHBleSdk.formatRecordStorage(object : RecordFormatCallback {
     }
 })
 ```
+
+##### 3.2.5.7 Real-time Recording
+
+> Requires `isSupportRecording` and device firmware that supports real-time recording.
+
+`fun recordRealtimeControl(start: Boolean, callback: RecordControlCallback)`
+
+| Parameter / callback | Description |
+| -------------------- | ----------- |
+| start | `true`: start real-time recording; `false`: stop |
+| callback | `onResult(Int)` returns the resulting recording state (1 recording, 0 idle), and `onFail(errorCode)` reports failure. Audio is not returned through this callback. |
+
+Audio arrives through `OnDevicePushListener` as `DevicePushType.RECORD_REALTIME_DATA`. Its `value` is a `RecordRealtimeDataBean`:
+
+| Property | Type | Description |
+| -------- | ---- | ----------- |
+| sequence | Int | Packet sequence 0–255, wrapping from 255 to 0; use it to check packet loss and ordering |
+| audioData | ByteArray | Raw Opus-compressed audio data for this packet |
+
+```kotlin
+val recordingListener = object : OnDevicePushListener {
+    override fun onPush(data: PushData) {
+        if (data.type != DevicePushType.RECORD_REALTIME_DATA) return
+        val packet = data.value as? RecordRealtimeDataBean ?: return
+        // Process packet.audioData in arrival order. Do not perform slow work in this callback.
+        Log.e("RWSDK", "audio sequence=${packet.sequence}, size=${packet.audioData.size}")
+    }
+}
+DHBleSdk.addOnDevicePushListener(recordingListener)
+
+val controlCallback = object : RecordControlCallback {
+    override fun onSuccess() = Unit
+    override fun onResult(data: Int) { Log.e("RWSDK", "recording state=$data") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "record control failed=$errorCode") }
+}
+DHBleSdk.recordRealtimeControl(true, controlCallback)
+// To stop: DHBleSdk.recordRealtimeControl(false, controlCallback)
+// When leaving the page or no longer needed: DHBleSdk.removeOnDevicePushListener(recordingListener)
+```
+
+Register the listener before starting. Recording status remains available through `RECORD_STATUS` pushes or `getRecordStatus()`; `realtime` indicates whether real-time mode is active.
 
 #### 5.2.5 Sensor Raw Data
 
@@ -3131,6 +3212,12 @@ fun unregisterSleepRawDataCallback() {
 ```
 
 ## SDK Revision History
+
+**V2.0.0_20261022** (2026.10.22)
+
+- Added `recordRealtimeControl` and real-time audio listening (3.2.5.7).
+- Added counting recognition control, state queries and push notifications (3.2.1.33); added `isSupportCountControl` to the function menu.
+- Added the `deviceForm` product form field to scan results and device version information (3.1.1, 3.2.1.3).
 
 **V2.0.0_20261012** (2026.10.12)
 
