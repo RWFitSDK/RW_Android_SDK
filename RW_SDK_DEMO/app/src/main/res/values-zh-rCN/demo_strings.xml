@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="demo_ppg_sample_rate">PPG采样率</string>
+    <string name="demo_ppg_sample_rate_desc">获取或设置采样率，单位Hz，具体值需固件支持</string>
+    <string name="demo_ppg_sample_rate_hint">采样率(Hz)，例如100或200</string>
+    <string name="demo_ppg_sample_rate_invalid">请输入有效整数</string>
+    <string name="demo_customer_model">客户型号</string>
+    <string name="demo_customer_model_desc">获取或设置客户自定义型号</string>
+    <string name="demo_customer_model_hint">请输入客户型号</string>
+    <string name="demo_setting_read">获取当前值</string>
+    <string name="demo_setting_write">设置</string>
+    <string name="demo_setting_empty_value">空</string>
     <string name="demo_device_form_screenless_ring">无屏戒指</string>
     <string name="demo_device_form_screen_ring">有屏戒指</string>
     <string name="demo_device_form_screenless_bracelet">无屏手链</string>

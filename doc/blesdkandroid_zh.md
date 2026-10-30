@@ -279,6 +279,8 @@ DeviceFuncV2Model类属性定义:
 | isSupportVibrationControl | 是否支持自定义震动控制 |
 | isSupportCustomNumberDisplay | 是否支持自定义数字显示 |
 | isSupportCountControl | 是否支持计数识别开关与状态查询 |
+| isSupportPpgSampleRate | 是否支持PPG采样率设置与获取 |
+| isSupportCustomerModel | 是否支持客户型号设置与获取 |
 
 
 ##### 3.1.7 读取连接态 RSSI
@@ -388,6 +390,7 @@ DHBleSdk.setUserInfo(persionBean)
 | screenHeight        | int    | 屏幕高度                     |
 | uiVersion           | String | UI版本号                     |
 | deviceForm          | int    | 产品形态：0无屏戒指、1有屏戒指、2无屏手链、3有屏手链、4无屏手环、5有屏手环、6手表；-1未提供或不支持 |
+| customerModel | String | 客户型号；默认与设备型号一致，未提供时返回设备型号deviceClazz。设置与查询见3.2.1.34 |
 
 > **注意:** 升级固件前必须校验设备的 `deviceClazz` 与升级固件对应的设备型号是否一致, 只有型号一致时才能进行升级, 型号不一致时禁止升级.
 
@@ -1963,6 +1966,34 @@ DHBleSdk.getCountControl(object : CountControlCallback {
 
 状态变化通过 `DevicePushType.COUNT_CONTROL` 推送，`value` 为Boolean；实时计数通过 `DevicePushType.MUSLIM_COUNT` 返回 `MuslimCountItemBean`。监听方式见 [3.2.1.21](#32121-设备主动推送监听)。
 
+##### 3.2.1.34 客户型号设置与获取
+
+> 功能配置表属性：`isSupportCustomerModel`。客户型号默认与设备型号一致，可用于业务区分，不改变原设备型号 `deviceClazz`；OTA固件匹配仍使用 `deviceClazz`。也可通过 `FirmVersionBean.customerModel` 读取客户型号。
+
+```kotlin
+fun setCustomerModel(model: String, callback: CustomStatusCallback)
+fun getCustomerModel(callback: CustomerModelCallback)
+```
+
+| 参数/回调 | 说明 |
+| --------- | ---- |
+| model | 客户型号，最多8个字符，仅支持英文字母和数字 |
+| CustomStatusCallback | `onSuccess()`设置成功；`onFail(errorCode)`失败 |
+| CustomerModelCallback | `onResult(String)`返回当前客户型号；`onFail(errorCode)`失败 |
+
+```kotlin
+DHBleSdk.setCustomerModel("MODEL001", object : CustomStatusCallback {
+    override fun onSuccess() { Log.e("RWSDK", "customer model saved") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "set failed=$errorCode") }
+})
+
+DHBleSdk.getCustomerModel(object : CustomerModelCallback {
+    override fun onSuccess() = Unit
+    override fun onResult(data: String) { Log.e("RWSDK", "customer model=$data") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "get failed=$errorCode") }
+})
+```
+
 #### 3.2.2 健康数据同步(实时单次与全天检测)
 
 > 健康数据检测有两种方式: 实时单次检测与全天检测。健康数据包括心率,血氧,压力,HRV,睡眠等, **睡眠无实时检测**。 
@@ -3256,7 +3287,40 @@ fun unregisterSleepRawDataCallback() {
 
    
 
+##### 5.2.5.4 PPG采样率设置与获取
+
+> 功能配置表属性：`isSupportPpgSampleRate`。设置或查询PPG采样率，单位Hz，例如100Hz、200Hz，具体可用值需设备固件支持。
+
+```kotlin
+fun setPpgSampleRate(sampleRate: Int, callback: CustomStatusCallback)
+fun getPpgSampleRate(callback: PpgSampleRateCallback)
+```
+
+| 参数/回调 | 说明 |
+| --------- | ---- |
+| sampleRate | 采样率，单位Hz，具体可用值需设备固件支持 |
+| CustomStatusCallback | `onSuccess()`设置成功；`onFail(errorCode)`失败 |
+| PpgSampleRateCallback | `onResult(Int)`返回当前采样率，单位Hz；`onFail(errorCode)`失败 |
+
+```kotlin
+DHBleSdk.setPpgSampleRate(100, object : CustomStatusCallback {
+    override fun onSuccess() { Log.e("RWSDK", "PPG sample rate saved") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "set failed=$errorCode") }
+})
+
+DHBleSdk.getPpgSampleRate(object : PpgSampleRateCallback {
+    override fun onSuccess() = Unit
+    override fun onResult(data: Int) { Log.e("RWSDK", "PPG sample rate=$data Hz") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "get failed=$errorCode") }
+})
+```
+
 ## SDK修订记录
+
+**v2.0.0_20261028** (2026.10.28)
+
+- 新增PPG采样率设置与获取接口 `setPpgSampleRate`/`getPpgSampleRate`(5.2.5.4)，功能表新增 `isSupportPpgSampleRate`
+- 新增客户型号设置与获取接口 `setCustomerModel`/`getCustomerModel`(3.2.1.34)，功能表新增 `isSupportCustomerModel`，设备信息新增 `customerModel`
 
 **v2.0.0_20261022** (2026.10.22)
 

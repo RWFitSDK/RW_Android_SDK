@@ -3,11 +3,13 @@ package com.dhouse.dhsdk_v2.ui.device
 import android.content.Intent
 import android.app.TimePickerDialog
 import android.os.Bundle
+import android.text.InputType
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.NumberPicker
+import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
@@ -39,6 +41,7 @@ class DeviceFragment : Fragment() {
     private var sensorHistoryCallback: SensorHistoryRawCallback? = null
     private var sensorHistoryLoadingDialog: AlertDialog? = null
     private var customNumberDialog: BottomSheetDialog? = null
+    private var firmwareSettingDialog: AlertDialog? = null
 
     private val sensorRawControlCallback = object : SensorRawControlCallback {
         override fun onResult(data: Int?) {
@@ -93,6 +96,8 @@ class DeviceFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        firmwareSettingDialog?.dismiss()
+        firmwareSettingDialog = null
         customNumberDialog?.dismiss()
         customNumberDialog = null
         DHBleSdk.dispose(sensorRawControlCallback)
@@ -108,6 +113,10 @@ class DeviceFragment : Fragment() {
 
     private fun render(state: DemoUiState) {
         if (_binding == null) return
+        if (!state.ready) {
+            settingValues.remove("ppg_sample_rate")
+            settingValues.remove("customer_model")
+        }
         val device = state.device
         binding.deviceName.text = device?.bleName?.takeIf { it.isNotBlank() }
             ?: device?.bleDeviceId?.takeIf { it.isNotBlank() }
@@ -184,6 +193,7 @@ class DeviceFragment : Fragment() {
             }
             "screen_control" -> showScreenControlActions(item.id)
             "custom_number_display" -> showCustomNumberInput(item.id)
+            "ppg_sample_rate", "customer_model" -> showFirmwareSetting(item.id)
             "raise_to_wake" -> editTimeRange(getString(R.string.demo_raise_to_wake), 8, 0, 20, 0) { enabled, sh, sm, eh, em ->
                 val callback = object : BrightCallback {
                     override fun onResult(data: BrightScreenBean?) = Unit
@@ -763,6 +773,100 @@ class DeviceFragment : Fragment() {
         dialog.show()
     }
 
+    private fun showFirmwareSetting(settingId: String) {
+        val sampleRate = settingId == "ppg_sample_rate"
+        val title = if (sampleRate) R.string.demo_ppg_sample_rate else R.string.demo_customer_model
+        val mac = DemoStateStore.state.device?.bleMac
+        firmwareSettingDialog = AlertDialog.Builder(requireContext())
+            .setTitle(title)
+            .setItems(arrayOf(getString(R.string.demo_setting_read), getString(R.string.demo_setting_write))) { _, action ->
+                if (!isCurrentDeviceTarget(mac)) return@setItems
+                if (action == 0) readFirmwareSetting(settingId, mac)
+                else editFirmwareSetting(settingId, mac)
+            }
+            .show()
+    }
+
+    private fun editFirmwareSetting(settingId: String, mac: String?) {
+        val sampleRate = settingId == "ppg_sample_rate"
+        val input = EditText(requireContext()).apply {
+            inputType = if (sampleRate) InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED else InputType.TYPE_CLASS_TEXT
+            isSingleLine = true
+            setHint(if (sampleRate) R.string.demo_ppg_sample_rate_hint else R.string.demo_customer_model_hint)
+            if (sampleRate) setText("100")
+            selectAll()
+        }
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle(if (sampleRate) R.string.demo_ppg_sample_rate else R.string.demo_customer_model)
+            .setView(input)
+            .setNegativeButton(R.string.demo_cancel, null)
+            .setPositiveButton(R.string.demo_confirm, null)
+            .create()
+        firmwareSettingDialog = dialog
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val value = input.text.toString()
+                val rate = value.toIntOrNull()
+                if (sampleRate && rate == null) {
+                    input.error = getString(R.string.demo_ppg_sample_rate_invalid)
+                    return@setOnClickListener
+                }
+                if (!isCurrentDeviceTarget(mac)) {
+                    dialog.dismiss()
+                    return@setOnClickListener
+                }
+                Log.e("RWSDK", "$settingId set request value=$value")
+                val callback = object : CustomStatusCallback {
+                    override fun onSuccess() {
+                        Log.e("RWSDK", "$settingId set success value=$value")
+                        if (!isCurrentDeviceTarget(mac)) return
+                        toast(getString(R.string.demo_setting_success))
+                        readFirmwareSetting(settingId, mac)
+                    }
+                    override fun onFail(errorCode: Int) = firmwareSettingFailed(settingId, mac, errorCode)
+                }
+                if (sampleRate) DHBleSdk.setPpgSampleRate(requireNotNull(rate), callback)
+                else DHBleSdk.setCustomerModel(value, callback)
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+    }
+
+    private fun readFirmwareSetting(settingId: String, mac: String?) {
+        Log.e("RWSDK", "$settingId get request")
+        if (settingId == "ppg_sample_rate") {
+            DHBleSdk.getPpgSampleRate(object : PpgSampleRateCallback {
+                override fun onSuccess() = Unit
+                override fun onResult(data: Int?) {
+                    if (data != null) firmwareSettingResult(settingId, mac, "$data Hz")
+                }
+                override fun onFail(errorCode: Int) = firmwareSettingFailed(settingId, mac, errorCode)
+            })
+        } else {
+            DHBleSdk.getCustomerModel(object : CustomerModelCallback {
+                override fun onSuccess() = Unit
+                override fun onResult(data: String?) {
+                    if (data != null) firmwareSettingResult(settingId, mac, data)
+                }
+                override fun onFail(errorCode: Int) = firmwareSettingFailed(settingId, mac, errorCode)
+            })
+        }
+    }
+
+    private fun firmwareSettingResult(settingId: String, mac: String?, value: String) {
+        Log.e("RWSDK", "$settingId get result=$value")
+        if (!isCurrentDeviceTarget(mac)) return
+        val display = value.ifEmpty { getString(R.string.demo_setting_empty_value) }
+        updateSettingValue(settingId, display)
+        toast(display)
+    }
+
+    private fun firmwareSettingFailed(settingId: String, mac: String?, errorCode: Int) {
+        Log.e("RWSDK", "$settingId failed errorCode=$errorCode")
+        if (isCurrentDeviceTarget(mac)) toast(getString(R.string.demo_setting_failed, errorCode))
+    }
+
     private fun countControlStateText(armed: Boolean) = getString(
         if (armed) R.string.demo_count_control_armed else R.string.demo_count_control_disarmed)
 
@@ -781,7 +885,7 @@ class DeviceFragment : Fragment() {
                 DHBleSdk.setCountControl(armed, object : CustomStatusCallback {
                     override fun onSuccess() {
                         Log.e("RWSDK", "setCountControl success armed=$armed")
-                        if (!isCountControlTarget(mac)) return
+                        if (!isCurrentDeviceTarget(mac)) return
                         toast(getString(R.string.demo_setting_success))
                         // 设置结果返回后查询实际状态；主动推送也会独立更新此item。
                         getCountControl()
@@ -789,14 +893,14 @@ class DeviceFragment : Fragment() {
 
                     override fun onFail(errorCode: Int) {
                         Log.e("RWSDK", "setCountControl failed errorCode=$errorCode")
-                        if (isCountControlTarget(mac)) toast(getString(R.string.demo_setting_failed, errorCode))
+                        if (isCurrentDeviceTarget(mac)) toast(getString(R.string.demo_setting_failed, errorCode))
                     }
                 })
             }
         }
     }
 
-    private fun isCountControlTarget(mac: String?) = _binding != null && isAdded &&
+    private fun isCurrentDeviceTarget(mac: String?) = _binding != null && isAdded &&
         DemoStateStore.state.ready && DemoStateStore.state.device?.bleMac == mac
 
     private fun getCountControl() {
@@ -805,7 +909,7 @@ class DeviceFragment : Fragment() {
         DHBleSdk.getCountControl(object : CountControlCallback {
             override fun onResult(data: Boolean?) {
                 Log.e("RWSDK", "getCountControl result armed=$data")
-                if (data == null || !isCountControlTarget(mac)) return
+                if (data == null || !isCurrentDeviceTarget(mac)) return
                 DemoStateStore.updateCountControlState(data)
                 toast(countControlStateText(data))
             }
@@ -814,7 +918,7 @@ class DeviceFragment : Fragment() {
 
             override fun onFail(errorCode: Int) {
                 Log.e("RWSDK", "getCountControl failed errorCode=$errorCode")
-                if (isCountControlTarget(mac)) toast(getString(R.string.demo_setting_failed, errorCode))
+                if (isCurrentDeviceTarget(mac)) toast(getString(R.string.demo_setting_failed, errorCode))
             }
         })
     }

@@ -285,6 +285,8 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportVibrationControl | Supports custom vibration control |
 | isSupportCustomNumberDisplay | Supports custom number display |
 | isSupportCountControl | Supports counting recognition control and state queries |
+| isSupportPpgSampleRate | Supports setting and reading the PPG sample rate |
+| isSupportCustomerModel | Supports setting and reading the customer model |
 
 
 ##### 3.1.7 Read connected RSSI
@@ -390,6 +392,7 @@ Return Value:
 | screenHeight             | int    | Screen height                                    |
 | uiVersion                | String | UI version                                       |
 | deviceForm               | int    | Product form: 0 ring without a screen, 1 ring with a screen, 2 bracelet without a screen, 3 bracelet with a screen, 4 wristband without a screen, 5 wristband with a screen, 6 watch; -1 unavailable or unsupported |
+| customerModel | String | Customer model; defaults to the device model and returns the device model when unavailable. See 3.2.1.34 for setting and reading this value |
 
 > **Important:** Before a firmware upgrade, verify that the device's `deviceClazz` matches the device model supported by the firmware package. Proceed with the upgrade only when they match. Do not upgrade if they do not match.
 
@@ -1938,6 +1941,34 @@ DHBleSdk.getCountControl(object : CountControlCallback {
 
 State changes arrive as `DevicePushType.COUNT_CONTROL`, with a Boolean `value`. Real-time counts arrive as `DevicePushType.MUSLIM_COUNT`, with a `MuslimCountItemBean`. See [3.2.1.21](#32121-device-push-notification) for listener registration.
 
+##### 3.2.1.34 Set and Get Customer Model
+
+> Requires `isSupportCustomerModel`. The customer model defaults to the device model and can distinguish products in your application. It does not change `deviceClazz`, which must still be used to match OTA firmware.
+
+```kotlin
+fun setCustomerModel(model: String, callback: CustomStatusCallback)
+fun getCustomerModel(callback: CustomerModelCallback)
+```
+
+| Parameter/Callback | Description |
+| ------------------ | ----------- |
+| model | Customer model, up to 8 characters; English letters and digits only |
+| CustomStatusCallback | `onSuccess()` when saved; `onFail(errorCode)` on failure |
+| CustomerModelCallback | `onResult(String)` returns the current customer model; `onFail(errorCode)` on failure |
+
+```kotlin
+DHBleSdk.setCustomerModel("MODEL001", object : CustomStatusCallback {
+    override fun onSuccess() { Log.e("RWSDK", "customer model saved") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "set failed=$errorCode") }
+})
+
+DHBleSdk.getCustomerModel(object : CustomerModelCallback {
+    override fun onSuccess() = Unit
+    override fun onResult(data: String) { Log.e("RWSDK", "customer model=$data") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "get failed=$errorCode") }
+})
+```
+
 #### 3.2.2 Health Data Synchronization (Real-time Single Measurement and All-day Monitoring)
 
 > There are two ways to detect health data: real-time single measurement and all-day monitoring. Health data includes heart rate, blood oxygen, stress, HRV, sleep, etc. **Sleep data does not have real-time measurement.**
@@ -3211,7 +3242,40 @@ fun unregisterSleepRawDataCallback() {
 }
 ```
 
+##### 5.2.5.4 Set and Get PPG Sample Rate
+
+> Requires `isSupportPpgSampleRate`. Set or read the PPG sample rate in Hz, for example 100 Hz or 200 Hz. Supported values depend on the device firmware.
+
+```kotlin
+fun setPpgSampleRate(sampleRate: Int, callback: CustomStatusCallback)
+fun getPpgSampleRate(callback: PpgSampleRateCallback)
+```
+
+| Parameter/Callback | Description |
+| ------------------ | ----------- |
+| sampleRate | Sample rate in Hz. Supported values depend on the device firmware |
+| CustomStatusCallback | `onSuccess()` when saved; `onFail(errorCode)` on failure |
+| PpgSampleRateCallback | `onResult(Int)` returns the current sample rate in Hz; `onFail(errorCode)` on failure |
+
+```kotlin
+DHBleSdk.setPpgSampleRate(100, object : CustomStatusCallback {
+    override fun onSuccess() { Log.e("RWSDK", "PPG sample rate saved") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "set failed=$errorCode") }
+})
+
+DHBleSdk.getPpgSampleRate(object : PpgSampleRateCallback {
+    override fun onSuccess() = Unit
+    override fun onResult(data: Int) { Log.e("RWSDK", "PPG sample rate=$data Hz") }
+    override fun onFail(errorCode: Int) { Log.e("RWSDK", "get failed=$errorCode") }
+})
+```
+
 ## SDK Revision History
+
+**V2.0.0_20261028** (2026.10.28)
+
+- Added `setPpgSampleRate`/`getPpgSampleRate` for PPG sample rate (5.2.5.4); added `isSupportPpgSampleRate` to the function table.
+- Added `setCustomerModel`/`getCustomerModel` for the customer model (3.2.1.34); added `isSupportCustomerModel` to the function table and `customerModel` to device version information.
 
 **V2.0.0_20261022** (2026.10.22)
 

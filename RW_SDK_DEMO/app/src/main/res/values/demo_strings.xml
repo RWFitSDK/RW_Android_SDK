@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="demo_ppg_sample_rate">PPG sample rate</string>
+    <string name="demo_ppg_sample_rate_desc">Read or set the sample rate in Hz; requires firmware support</string>
+    <string name="demo_ppg_sample_rate_hint">Sample rate in Hz, e.g. 100 or 200</string>
+    <string name="demo_ppg_sample_rate_invalid">Enter a valid integer</string>
+    <string name="demo_customer_model">Customer model</string>
+    <string name="demo_customer_model_desc">Read or set the customer-defined model</string>
+    <string name="demo_customer_model_hint">Enter the customer model</string>
+    <string name="demo_setting_read">Read current value</string>
+    <string name="demo_setting_write">Set value</string>
+    <string name="demo_setting_empty_value">Empty</string>
     <string name="demo_device_form_screenless_ring">Ring without a screen</string>
     <string name="demo_device_form_screen_ring">Ring with a screen</string>
     <string name="demo_device_form_screenless_bracelet">Bracelet without a screen</string>

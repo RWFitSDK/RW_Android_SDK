@@ -38,6 +38,8 @@ fun buildDeviceSettings(context: Context, menu: SupportMenuBean?): List<DemoSett
     add(menu.isBloodSugar, "monitor_sugar", R.string.demo_all_day_blood_sugar, R.string.demo_monitor_desc)
     add(menu.isSupportTemperatureMonitoring, "monitor_temp", R.string.demo_all_day_temperature, R.string.demo_monitor_desc)
     add(menu.isSupportPPGMonitoring, "monitor_ppg", R.string.demo_timed_ppg, R.string.demo_monitor_desc)
+    add(menu.isSupportPpgSampleRate, "ppg_sample_rate", R.string.demo_ppg_sample_rate, R.string.demo_ppg_sample_rate_desc)
+    add(menu.isSupportCustomerModel, "customer_model", R.string.demo_customer_model, R.string.demo_customer_model_desc)
     add(menu.isSupportSensorRawPPG, "sensor_raw_ppg", R.string.demo_sensor_raw_ppg, R.string.demo_sensor_raw_ppg_desc)
     add(menu.isSupportHrReminder, "hr_alert", R.string.demo_hr_alert, R.string.demo_hr_alert_desc)
     add(menu.isSupportBoReminder, "bo_alert", R.string.demo_bo_alert, R.string.demo_bo_alert_desc)
