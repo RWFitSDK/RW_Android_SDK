@@ -270,7 +270,7 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportCountReminder      | Does it support count reminder interval setting?             |
 | isSupportSensorRawACC       | Does it support ACC raw data?                                |
 | isSupportSensorRawPPGRed    | Does it support PPG Red raw data?                            |
-| isSupportRecording          | Does it support recording?                                   |
+| isSupportRecording          | Does it support AI recording?                                |
 | isSupportDevicePasswordAuth | Does it support device password authentication?              |
 | isSupportDeviceChallenge    | Does it support device identity authentication (HMAC-SHA256 challenge-response)? |
 | isSupportSedentary          | Does it support sedentary reminder setting?                  |
@@ -278,7 +278,7 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportSensorRawIR        | Does it support IR (infrared) raw data?                      |
 | isSupportSensorRawSleep     | Does it support sleep real-time data?                        |
 | isSupportFallDetect         | Does it support fall detection alert?                        |
-| isSupportRecording          | Does it support recording function?                          |
+| isSupportRecording          | Does it support AI recording?                                |
 | isSupportDevicePasswordAuth | Does it support device password authentication?              |
 | isSupportScreenControl      | Does it support instant screen on/off control?                |
 | isSupportUnitSetting        | Does it support metric/imperial unit settings?                |
@@ -287,6 +287,8 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportCountControl | Supports counting recognition control and state queries |
 | isSupportPpgSampleRate | Supports setting and reading the PPG sample rate |
 | isSupportCustomerModel | Supports setting and reading the customer model |
+| isSupportCompositeMeasurement | Supports composite health measurement (3.2.2.1) |
+| isSupportCustomTextDisplay | Supports custom text display and duration settings (3.2.1.35) |
 
 
 ##### 3.1.7 Read connected RSSI
@@ -1969,6 +1971,33 @@ DHBleSdk.getCustomerModel(object : CustomerModelCallback {
 })
 ```
 
+##### 3.2.1.35 Custom Text Display with Duration
+
+> Requires `isSupportCustomTextDisplay`. Display English letters, digits, or a combination, for the specified duration. Calling again updates the content and restarts the display timer.
+
+`fun showCustomText(text: String, durationSeconds: Int, callback: CustomStatusCallback)`
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| text | String | Up to five English letters or digits; longer content is truncated to the first five characters. Must not be empty. |
+| durationSeconds | Int | Display duration in seconds; values below 1 are treated as 1 and values above 255 as 255. |
+| callback | CustomStatusCallback | `onSuccess()` is called when the device accepts the command, without waiting for the display to finish; `onFail(errorCode)` reports failure. |
+
+Invalid content is reported through `onFail(Constants.ERROR_INFO)`. Wait for the previous display request to complete before sending another.
+
+```kotlin
+if (supportMenu.isSupportCustomTextDisplay) {
+    DHBleSdk.showCustomText("A627", 5, object : CustomStatusCallback {
+        override fun onSuccess() {
+            Log.e("RWSDK", "Custom text display succeeded")
+        }
+        override fun onFail(errorCode: Int) {
+            Log.e("RWSDK", "Custom text display failed: $errorCode")
+        }
+    })
+}
+```
+
 #### 3.2.2 Health Data Synchronization (Real-time Single Measurement and All-day Monitoring)
 
 > There are two ways to detect health data: real-time single measurement and all-day monitoring. Health data includes heart rate, blood oxygen, stress, HRV, sleep, etc. **Sleep data does not have real-time measurement.**
@@ -1977,17 +2006,11 @@ DHBleSdk.getCustomerModel(object : CustomerModelCallback {
 >
 > (2) All-day monitoring: The interval time can be set, for example, 30 minutes or 60 minutes, and the device will perform the measurement and save the value; **if the app does not synchronize continuously, the device can save 3-6 days of data.**
 
+##### 3.2.2.0 Real-time Monitoring - Individual Measurement
 
-
-##### 3.2.2.1 Real-time Detection - Starting and Stopping Device Health Data Detection
-
-> Single measurement of health data (heart rate, blood oxygen, HRV, pressure, blood glucose, blood pressure, temperature);
+> [!NOTE]
 >
-> Callback `HealthMeasurementCallback`: onStarted (start confirmed) -> onData (real-time values, multiple frames) -> onFinished (measurement end / failure / timeout);
-
-> [!CAUTION]
->
-> Only one detection type can run at a time. You must wait for the current detection to finish (onFinished received) or be stopped manually before starting another type. Starting multiple types simultaneously causes detection errors.
+> Start or stop a single measurement of heart rate, blood oxygen, HRV, stress, blood glucose, blood pressure, or temperature. Individual and composite measurements cannot run at the same time; start the next measurement only after the current one finishes or is stopped manually.
 
 Method Description:
 
@@ -1999,7 +2022,7 @@ Parameter Description:
 | --------- | ------------------------- | ------------ | ---------------------------------------------------------------- |
 | type      | Int                       | Start/Stop   | 1: start / 0: stop                                               |
 | dataType  | Int                       | Data type    | `HealthDataType.code`, see the type table below                   |
-| callback  | HealthMeasurementCallback | Result callback | onStarted: start confirmed;<br>onData(HealthRealtimeValue): real-time value during measurement;<br>onFinished(HealthMeasurementResult): measurement finished (result.isSuccess) or failed/timed out (result.errorCode) |
+| callback  | HealthMeasurementCallback | Result callback | onStarted: start confirmed;<br>onData(HealthRealtimeValue): real-time value during measurement (dataType/timestamp/value/extraValue);<br>onFinished(HealthMeasurementResult): measurement finished (result.isSuccess) or failed/timed out (result.errorCode) |
 
 HealthDataType description:
 
@@ -2012,6 +2035,10 @@ HealthDataType description:
 | HRV            | Heart rate variability |
 | STRESS         | Stress          |
 | BLOOD_SUGAR    | Blood glucose   |
+
+Results: `onStarted()` confirms that measurement has started, `onData()` delivers real-time values, and `onFinished()` reports the session outcome. Receiving a value does not mean that the measurement has finished.
+
+In `onFinished(result)`, `result.isSuccess=true` indicates normal completion. If the device is not worn, `isSuccess=false` and `result.errorCode=Constants.ERROR_NOT_WORN`; put the device on and try again. Other failures or timeouts are identified by `result.errorCode`.
 
 Example of usage:
 
@@ -2029,16 +2056,82 @@ DHBleSdk.controlOpen(1, HealthDataType.HEART_RATE.code, object : HealthMeasureme
     override fun onFinished(result: HealthMeasurementResult) {
         if (result.isSuccess) {
             Log.e("RWSDK", "measurement finished")
+        } else if (result.errorCode == Constants.ERROR_NOT_WORN) {
+            Log.e("RWSDK", "Ring not worn. Please put it on and try again.")
         } else {
             Log.e("RWSDK", "measurement failed/timeout: ${result.errorCode}")
         }
     }
 })
+```
 
-//Stop heart rate measurement (finishes via onFinished)
+To stop early, call separately:
+
+```kotlin
 DHBleSdk.controlOpen(0, HealthDataType.HEART_RATE.code, object : HealthMeasurementCallback {
     override fun onStarted() = Unit
     override fun onData(data: HealthRealtimeValue) = Unit
+    override fun onFinished(result: HealthMeasurementResult) = Unit
+})
+```
+
+##### 3.2.2.1 Real-time Monitoring - Composite Measurement
+
+> Requires `isSupportCompositeMeasurement`. Only items actually reported by the device are returned. Do not run individual and composite measurements at the same time.
+
+Method:
+
+`fun controlCompositeMeasurement(type: Int, callback: CompositeMeasurementCallback)`
+
+Parameters and callbacks:
+
+| Parameter / callback | Description |
+| -------------------- | ----------- |
+| type | `1`: start; `0`: stop |
+| onStarted() | The device has confirmed that measurement has started |
+| onData(results) | `List<HealthRealtimeValue>` containing all items from one complete report; each item's `dataType` identifies the measurement, and all items share the same `timestamp` |
+| onFinished(result) | The session has ended or failed: `result.isSuccess=true` indicates normal completion; `result.errorCode=Constants.ERROR_NOT_WORN` means the device is not worn—put it on and try again; other error codes indicate failure. `result.dataType` is `HealthDataType.COMPOSITE.code` |
+
+Result fields: each item in `results` is a `HealthRealtimeValue`.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| dataType | Int | Measurement type, identified by `HealthDataType.code` in the individual measurement parameter table in 3.2.2.0 |
+| timestamp | Long | Unix timestamp in seconds; all items in one report share the same timestamp |
+| value | Double | Measured value; systolic pressure for blood pressure |
+| extraValue | Double | Diastolic pressure for blood pressure; 0 for other items |
+
+Receiving data does not indicate that the session has finished; wait for `onFinished()`.
+
+Example:
+
+```kotlin
+if (supportMenu.isSupportCompositeMeasurement) {
+    DHBleSdk.controlCompositeMeasurement(1, object : CompositeMeasurementCallback {
+        override fun onStarted() = Unit
+        override fun onData(results: List<HealthRealtimeValue>) {
+            // A complete report; use each item's dataType to update the corresponding value.
+            results.forEach { item ->
+                Log.e("RWSDK", "type=${item.dataType}, time=${item.timestamp}, value=${item.value}, extra=${item.extraValue}")
+            }
+        }
+        override fun onFinished(result: HealthMeasurementResult) {
+            if (result.errorCode == Constants.ERROR_NOT_WORN) {
+                Log.e("RWSDK", "Ring not worn. Please put it on and try again.")
+            } else {
+                Log.e("RWSDK", "Composite measurement ended: success=${result.isSuccess}, error=${result.errorCode}")
+            }
+        }
+    })
+}
+```
+
+To stop, call separately:
+
+```kotlin
+DHBleSdk.controlCompositeMeasurement(0, object : CompositeMeasurementCallback {
+    override fun onStarted() = Unit
+    override fun onData(results: List<HealthRealtimeValue>) = Unit
     override fun onFinished(result: HealthMeasurementResult) = Unit
 })
 ```
@@ -3272,6 +3365,12 @@ DHBleSdk.getPpgSampleRate(object : PpgSampleRateCallback {
 
 ## SDK Revision History
 
+**V2.0.0_20261104** (2026.11.04)
+
+- Fixed an issue where the customer model (`customerModel`) could not be read correctly from device information (3.2.1.3).
+- Added `showCustomText` for custom text display and duration settings (3.2.1.35); added `isSupportCustomTextDisplay` to the configuration table.
+- Added `controlCompositeMeasurement` for multiple health measurements in one session (3.2.2.1); added `isSupportCompositeMeasurement` to the configuration table.
+
 **V2.0.0_20261028** (2026.10.28)
 
 - Added `setPpgSampleRate`/`getPpgSampleRate` for PPG sample rate (5.2.5.4); added `isSupportPpgSampleRate` to the function table.
@@ -3304,7 +3403,7 @@ DHBleSdk.getPpgSampleRate(object : PpgSampleRateCallback {
 - Added device identity authentication interface (3.2.1.26.4); added `isSupportDeviceChallenge` to the function configuration table.
 - Added sedentary reminder setting and getting interface (3.2.1.29); added `isSupportSedentary` to the function configuration table.
 - Added drinking reminder setting and getting interface (3.2.1.30); added `isDrink` to the function configuration table.
-- Added unified continuous monitoring setting interface `setHealthMonitor`/`getHealthMonitor` (3.2.2.2, by `HealthMonitorType`) and the single real-time detection interface `controlOpen` (3.2.2.1, session-style callback); old interfaces remain available.
+- Added unified continuous monitoring setting interface `setHealthMonitor`/`getHealthMonitor` (3.2.2.2, by `HealthMonitorType`) and the single real-time detection interface `controlOpen` (3.2.2.0, session-style callback); old interfaces remain available.
 
 **V2.0.0_20260909** (2026.09.09)
 

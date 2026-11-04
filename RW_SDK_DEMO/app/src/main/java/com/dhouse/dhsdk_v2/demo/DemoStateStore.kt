@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import androidx.annotation.StringRes
 import com.dhouse.dhsdk_v2.R
 import com.dhouse.dhsdk_v2.SavedDeviceStore
@@ -19,6 +20,7 @@ import com.example.blesdk.blering.RingBleError
 import com.example.blesdk.blering.RingConnectBleCallback
 import com.example.blesdk.callback.HealthDataSyncCallback
 import com.example.blesdk.callback.data.HealthMeasurementCallback
+import com.example.blesdk.callback.data.CompositeMeasurementCallback
 import com.example.blesdk.blering.OnDevicePushListener
 import com.example.blesdk.blering.DevicePushType
 import com.example.blesdk.blering.PushData
@@ -50,6 +52,8 @@ data class DemoUiState(
     val syncing: Boolean = false,
     val syncProgress: Int = 0,
     val activeMeasurement: DemoHealthType? = null,
+    val compositeMeasurementRunning: Boolean = false,
+    val compositeMeasurementText: String? = null,
     val summaryValues: Map<String, DemoHealthRecord> = emptyMap(),
     val realtimeValues: Map<String, DemoHealthRecord> = emptyMap(),
     val records: Map<String, List<DemoHealthRecord>> = emptyMap()
@@ -190,7 +194,9 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
                 connectionMessage = text(R.string.demo_disconnected),
                 syncing = false,
                 syncProgress = 0,
-                activeMeasurement = null
+                activeMeasurement = null,
+                compositeMeasurementRunning = false,
+                compositeMeasurementText = null
             )
         }
         DHBleSdk.disconnect()
@@ -215,7 +221,7 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
 
     fun startMeasurement(type: DemoHealthType) {
         val dataType = type.measurementDataType ?: return
-        if (!state.ready) return
+        if (!state.ready || state.compositeMeasurementRunning) return
         update { it.copy(activeMeasurement = type) }
         DHBleSdk.controlOpen(1, dataType, object : HealthMeasurementCallback {
             override fun onStarted() = Unit
@@ -230,6 +236,7 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
             }
             override fun onFinished(result: HealthMeasurementResult) {
                 update { it.copy(activeMeasurement = null) }
+                showNotWornToast(result)
             }
         })
     }
@@ -240,6 +247,62 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
         DHBleSdk.controlOpen(0, dataType, object : HealthMeasurementCallback {
             override fun onStarted() = Unit
             override fun onData(data: HealthRealtimeValue) = Unit
+            override fun onFinished(result: HealthMeasurementResult) = Unit
+        })
+    }
+
+    fun startCompositeMeasurement() {
+        if (!state.ready || state.supportMenu?.isSupportCompositeMeasurement != true
+            || state.activeMeasurement != null || state.compositeMeasurementRunning) return
+        val values = linkedMapOf<Int, String>()
+        update { it.copy(compositeMeasurementRunning = true,
+            compositeMeasurementText = text(R.string.demo_composite_measuring)) }
+        DHBleSdk.controlCompositeMeasurement(1, object : CompositeMeasurementCallback {
+            override fun onStarted() {
+                Log.e("RWSDK", "composite measurement started")
+            }
+            override fun onData(results: List<HealthRealtimeValue>) {
+                values.clear()
+                for (data in results) {
+                    val item = DemoHealthType.values().firstOrNull { it.measurementDataType == data.dataType } ?: continue
+                    val value = when (data.dataType) {
+                        HealthDataType.BLOOD_PRESSURE.code -> "${data.value.toInt()}/${data.extraValue.toInt()}"
+                        HealthDataType.BLOOD_SUGAR.code, HealthDataType.TEMPERATURE.code -> "%.1f".format(data.value)
+                        else -> data.value.toInt().toString()
+                    }
+                    values[data.dataType] = "${text(item.titleRes)}: $value ${item.unit}".trim()
+                }
+                Log.e("RWSDK", "composite measurement packet items=${results.size}: " + results.joinToString {
+                    "type=${it.dataType} timestamp=${it.timestamp} value=${it.value} extra=${it.extraValue}"
+                })
+                update { it.copy(compositeMeasurementText =
+                    (listOf(text(R.string.demo_composite_measuring)) + values.values).joinToString("\n")) }
+            }
+            override fun onFinished(result: HealthMeasurementResult) {
+                val status = if (result.isSuccess) text(R.string.demo_composite_finished)
+                    else text(R.string.demo_setting_failed, result.errorCode)
+                Log.e("RWSDK", "composite measurement finished success=${result.isSuccess} error=${result.errorCode}")
+                update { it.copy(compositeMeasurementRunning = false,
+                    compositeMeasurementText = (listOf(status) + values.values).joinToString("\n")) }
+                showNotWornToast(result)
+            }
+        })
+    }
+
+    private fun showNotWornToast(result: HealthMeasurementResult) {
+        if (result.isSuccess || result.errorCode != Constants.ERROR_NOT_WORN) return
+        val context = appContext ?: return
+        Log.e("RWSDK", "measurement finished: device not worn, type=${result.dataType}")
+        mainHandler.post {
+            Toast.makeText(context, R.string.demo_measurement_not_worn, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun stopCompositeMeasurement() {
+        if (!state.ready || !state.compositeMeasurementRunning) return
+        DHBleSdk.controlCompositeMeasurement(0, object : CompositeMeasurementCallback {
+            override fun onStarted() = Unit
+            override fun onData(results: List<HealthRealtimeValue>) = Unit
             override fun onFinished(result: HealthMeasurementResult) = Unit
         })
     }
@@ -257,6 +320,7 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
         val firmwareCallback = object : FirmwareCallback {
             override fun onResult(data: FirmVersionBean?) {
                 data?.let { value ->
+                    Log.e("RWSDK", "getFirmwareVersionJL deviceNo=${value.deviceNo} deviceClazz=${value.deviceClazz} customerModel=${value.customerModel}")
                     update { it.copy(firmwareVersion = value.deviceNo, deviceModel = value.deviceClazz) }
                 }
                 DHBleSdk.dispose(this)
@@ -281,7 +345,9 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
             appContext?.let { context -> SavedDeviceStore.save(context, it) }
         }
         update {
-            it.copy(device = connectedDevice, countArmed = null, connected = true, ready = false, connecting = true, connectionMessage = text(R.string.demo_initializing))
+            it.copy(device = connectedDevice, countArmed = null, compositeMeasurementRunning = false,
+                compositeMeasurementText = null, connected = true, ready = false, connecting = true,
+                connectionMessage = text(R.string.demo_initializing))
         }
     }
 
@@ -294,6 +360,8 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
                 syncing = false,
                 syncProgress = 0,
                 activeMeasurement = null,
+                compositeMeasurementRunning = false,
+                compositeMeasurementText = null,
                 countArmed = null,
                 connectionMessage = if (reason == RingBleError.PASSWORD_AUTH_FAILED) {
                     text(R.string.demo_password_auth_failed)

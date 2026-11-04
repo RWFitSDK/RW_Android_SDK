@@ -1,6 +1,7 @@
 package com.dhouse.dhsdk_v2.ui.adapter
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.dhouse.dhsdk_v2.databinding.ItemDeviceSettingBinding
@@ -30,6 +31,11 @@ class DeviceSettingAdapter(private val onClick: (DemoSettingItem) -> Unit) :
             binding.settingTitle.text = item.title
             binding.settingSubtitle.text = item.subtitle
             binding.settingValue.text = item.valueText
+            val expanded = item.id == "composite_measurement"
+            binding.settingSubtitle.visibility = if (expanded) View.GONE else View.VISIBLE
+            binding.settingValue.visibility = if (expanded) View.GONE else View.VISIBLE
+            binding.settingExpandedValue.visibility = if (expanded) View.VISIBLE else View.GONE
+            binding.settingExpandedValue.text = if (expanded) item.valueText else null
             binding.root.setOnClickListener { onClick(item) }
         }
     }

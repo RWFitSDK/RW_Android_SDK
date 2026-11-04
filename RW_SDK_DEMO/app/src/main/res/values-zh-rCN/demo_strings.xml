@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="demo_composite_measurement">综合检测</string>
+    <string name="demo_composite_measurement_desc">一轮检测多项健康数据（不含血氧）</string>
+    <string name="demo_composite_start">开始检测</string>
+    <string name="demo_composite_stop">停止检测</string>
+    <string name="demo_composite_measuring">检测中…</string>
+    <string name="demo_composite_finished">检测完成</string>
+    <string name="demo_measurement_not_worn">未佩戴，请佩戴后重试</string>
+    <string name="demo_composite_busy">请等待当前检测结束，或先停止当前检测</string>
     <string name="demo_ppg_sample_rate">PPG采样率</string>
     <string name="demo_ppg_sample_rate_desc">获取或设置采样率，单位Hz，具体值需固件支持</string>
     <string name="demo_ppg_sample_rate_hint">采样率(Hz)，例如100或200</string>
@@ -7,6 +15,10 @@
     <string name="demo_customer_model">客户型号</string>
     <string name="demo_customer_model_desc">获取或设置客户自定义型号</string>
     <string name="demo_customer_model_hint">请输入客户型号</string>
+    <string name="demo_device_name">设置名字</string>
+    <string name="demo_device_name_desc">修改设备蓝牙名称</string>
+    <string name="demo_device_name_hint">请输入设备名称</string>
+    <string name="demo_device_name_invalid">请输入1～24字节的名称</string>
     <string name="demo_setting_read">获取当前值</string>
     <string name="demo_setting_write">设置</string>
     <string name="demo_setting_empty_value">空</string>
@@ -116,6 +128,10 @@
     <string name="demo_custom_number_desc">显示0～9999数字，持续3秒</string>
     <string name="demo_custom_number_hint">0～9999</string>
     <string name="demo_custom_number_show">显示</string>
+    <string name="demo_custom_text_display">自定义字符显示</string>
+    <string name="demo_custom_text_desc">显示最多5个英文字母或数字，可设置显示时长</string>
+    <string name="demo_custom_text_hint">请输入1～5个英文字母或数字</string>
+    <string name="demo_custom_text_duration_hint">显示时长（秒，1～255）</string>
     <string name="demo_count_control">计数控制</string>
     <string name="demo_count_control_desc">获取、开启或关闭；设备推送自动更新状态</string>
     <string name="demo_count_control_unknown">未获取</string>

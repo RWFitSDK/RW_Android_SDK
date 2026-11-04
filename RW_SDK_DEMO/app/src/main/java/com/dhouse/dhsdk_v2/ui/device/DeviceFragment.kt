@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.dhouse.dhsdk_v2.R
 import com.dhouse.dhsdk_v2.databinding.FragmentDeviceBinding
 import com.dhouse.dhsdk_v2.databinding.DialogCustomNumberBinding
+import com.dhouse.dhsdk_v2.databinding.DialogCustomTextBinding
 import com.dhouse.dhsdk_v2.demo.*
 import com.dhouse.dhsdk_v2.XXApplication
 import com.dhouse.dhsdk_v2.ui.ScanActivity
@@ -41,7 +42,9 @@ class DeviceFragment : Fragment() {
     private var sensorHistoryCallback: SensorHistoryRawCallback? = null
     private var sensorHistoryLoadingDialog: AlertDialog? = null
     private var customNumberDialog: BottomSheetDialog? = null
+    private var customTextDialog: BottomSheetDialog? = null
     private var firmwareSettingDialog: AlertDialog? = null
+    private var btNameCallback: BtNameCallback? = null
 
     private val sensorRawControlCallback = object : SensorRawControlCallback {
         override fun onResult(data: Int?) {
@@ -96,10 +99,14 @@ class DeviceFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        btNameCallback?.let(DHBleSdk::dispose)
+        btNameCallback = null
         firmwareSettingDialog?.dismiss()
         firmwareSettingDialog = null
         customNumberDialog?.dismiss()
         customNumberDialog = null
+        customTextDialog?.dismiss()
+        customTextDialog = null
         DHBleSdk.dispose(sensorRawControlCallback)
         sensorHistoryCallback?.let(DHBleSdk::dispose)
         sensorHistoryCallback = null
@@ -116,6 +123,10 @@ class DeviceFragment : Fragment() {
         if (!state.ready) {
             settingValues.remove("ppg_sample_rate")
             settingValues.remove("customer_model")
+            settingValues.remove("bt_name")
+            settingValues.remove("custom_text_display")
+            btNameCallback?.let(DHBleSdk::dispose)
+            btNameCallback = null
         }
         val device = state.device
         binding.deviceName.text = device?.bleName?.takeIf { it.isNotBlank() }
@@ -133,7 +144,9 @@ class DeviceFragment : Fragment() {
         binding.readRssi.isEnabled = state.ready
         binding.searchDevice.text = getString(if (device == null) R.string.demo_search_device else R.string.demo_unbind_device)
         val settings = buildDeviceSettings(requireContext(), state.supportMenu).map { item ->
-            if (item.id == "count_control") {
+            if (item.id == "composite_measurement") {
+                item.copy(valueText = state.compositeMeasurementText ?: item.valueText)
+            } else if (item.id == "count_control") {
                 item.copy(valueText = state.countArmed?.let(::countControlStateText)
                     ?: getString(R.string.demo_count_control_unknown))
             } else settingValues[item.id]?.let { item.copy(valueText = it) } ?: item
@@ -166,6 +179,15 @@ class DeviceFragment : Fragment() {
             return
         }
         when (item.id) {
+            "composite_measurement" -> choose(getString(R.string.demo_composite_measurement), arrayOf(
+                getString(R.string.demo_composite_start), getString(R.string.demo_composite_stop)
+            )) { index ->
+                if (index == 0) {
+                    if (DemoStateStore.state.activeMeasurement != null || DemoStateStore.state.compositeMeasurementRunning) {
+                        toast(getString(R.string.demo_composite_busy))
+                    } else DemoStateStore.startCompositeMeasurement()
+                } else DemoStateStore.stopCompositeMeasurement()
+            }
             "alarm" -> showAlarmActions()
             "screen_sleep" -> editTimeRange(getString(R.string.demo_screen_sleep), 20, 0, 8, 0) { enabled, sh, sm, eh, em ->
                 val callback = object : BrightTimeCallback {
@@ -193,7 +215,9 @@ class DeviceFragment : Fragment() {
             }
             "screen_control" -> showScreenControlActions(item.id)
             "custom_number_display" -> showCustomNumberInput(item.id)
+            "custom_text_display" -> showCustomTextInput(item.id)
             "ppg_sample_rate", "customer_model" -> showFirmwareSetting(item.id)
+            "bt_name" -> showDeviceNameInput(item.id)
             "raise_to_wake" -> editTimeRange(getString(R.string.demo_raise_to_wake), 8, 0, 20, 0) { enabled, sh, sm, eh, em ->
                 val callback = object : BrightCallback {
                     override fun onResult(data: BrightScreenBean?) = Unit
@@ -769,6 +793,107 @@ class DeviceFragment : Fragment() {
         dialog.setContentView(form.root)
         dialog.setOnDismissListener {
             if (customNumberDialog === dialog) customNumberDialog = null
+        }
+        dialog.show()
+    }
+
+    private fun showCustomTextInput(settingId: String) {
+        customTextDialog?.dismiss()
+        val mac = DemoStateStore.state.device?.bleMac
+        val form = DialogCustomTextBinding.inflate(layoutInflater)
+        val dialog = BottomSheetDialog(requireContext())
+        customTextDialog = dialog
+        form.textInput.setText("A627")
+        form.durationInput.setText("5")
+        form.cancel.setOnClickListener { dialog.dismiss() }
+        form.confirm.setOnClickListener {
+            val text = form.textInput.text.toString()
+            if (text.isEmpty()) {
+                form.textInput.error = getString(R.string.demo_custom_text_hint)
+                return@setOnClickListener
+            }
+            val duration = (form.durationInput.text.toString().toIntOrNull() ?: 5).coerceIn(1, 255)
+            if (!isCurrentDeviceTarget(mac) || DemoStateStore.state.supportMenu?.isSupportCustomTextDisplay != true) {
+                dialog.dismiss()
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            DHBleSdk.showCustomText(text, duration, object : CustomStatusCallback {
+                override fun onSuccess() {
+                    Log.e("RWSDK", "showCustomText success text=$text durationSeconds=$duration")
+                    if (!isCurrentDeviceTarget(mac)) return
+                    updateSettingValue(settingId, "$text · ${getString(R.string.demo_seconds_value, duration)}")
+                    toast(getString(R.string.demo_setting_success))
+                }
+
+                override fun onFail(errorCode: Int) {
+                    Log.e("RWSDK", "showCustomText failed text=$text durationSeconds=$duration errorCode=$errorCode")
+                    if (isCurrentDeviceTarget(mac)) toast(getString(R.string.demo_setting_failed, errorCode))
+                }
+            })
+        }
+        dialog.setContentView(form.root)
+        dialog.setOnDismissListener {
+            if (customTextDialog === dialog) customTextDialog = null
+        }
+        dialog.show()
+    }
+
+    private fun showDeviceNameInput(settingId: String) {
+        if (btNameCallback != null) return
+        val mac = DemoStateStore.state.device?.bleMac
+        val input = EditText(requireContext()).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            isSingleLine = true
+            setHint(R.string.demo_device_name_hint)
+            setText(settingValues[settingId].orEmpty())
+            selectAll()
+        }
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle(R.string.demo_device_name)
+            .setView(input)
+            .setNegativeButton(R.string.demo_cancel, null)
+            .setPositiveButton(R.string.demo_confirm, null)
+            .create()
+        firmwareSettingDialog = dialog
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val name = input.text.toString().trim()
+                if (name.isEmpty() || name.toByteArray(Charsets.UTF_8).size > 24) {
+                    input.error = getString(R.string.demo_device_name_invalid)
+                    return@setOnClickListener
+                }
+                if (!isCurrentDeviceTarget(mac) || btNameCallback != null) {
+                    dialog.dismiss()
+                    return@setOnClickListener
+                }
+                val callback = object : BtNameCallback {
+                    override fun onResult(data: BtNameBean?) = Unit
+
+                    override fun onSuccess() {
+                        DHBleSdk.dispose(this)
+                        if (btNameCallback !== this) return
+                        btNameCallback = null
+                        Log.e("RWSDK", "setRingBtName success name=$name")
+                        if (!isCurrentDeviceTarget(mac)) return
+                        updateSettingValue(settingId, name)
+                        toast(getString(R.string.demo_setting_success))
+                    }
+
+                    override fun onFail(errorCode: Int) {
+                        DHBleSdk.dispose(this)
+                        if (btNameCallback !== this) return
+                        btNameCallback = null
+                        Log.e("RWSDK", "setRingBtName failed errorCode=$errorCode")
+                        if (isCurrentDeviceTarget(mac)) toast(getString(R.string.demo_setting_failed, errorCode))
+                    }
+                }
+                btNameCallback = callback
+                DHBleSdk.subscribeData(callback)
+                Log.e("RWSDK", "setRingBtName request name=$name")
+                DHBleSdk.setRingBtName(BtNameBean().apply { btName = name })
+                dialog.dismiss()
+            }
         }
         dialog.show()
     }

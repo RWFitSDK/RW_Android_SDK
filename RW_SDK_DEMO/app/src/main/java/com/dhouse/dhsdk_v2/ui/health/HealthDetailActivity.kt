@@ -72,7 +72,7 @@ class HealthDetailActivity : AppCompatActivity() {
             val measuring = state.activeMeasurement == type
             binding.measurementStatus.text = getString(if (measuring) R.string.demo_measuring else R.string.demo_not_started)
             binding.measurementAction.text = getString(if (measuring) R.string.demo_stop_measurement else R.string.demo_start_measurement)
-            binding.measurementAction.isEnabled = state.ready
+            binding.measurementAction.isEnabled = state.ready && !state.compositeMeasurementRunning
         }
     }
 

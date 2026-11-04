@@ -269,7 +269,7 @@ DeviceFuncV2Model类属性定义:
 | isSupportSensorRawIR        | 是否支持获取IR红外原始数据  |
 | isSupportSensorRawSleep     | 是否支持睡眠实时数据       |
 | isSupportFallDetect         | 是否支持跌落提醒           |
-| isSupportRecording          | 是否支持录音功能           |
+| isSupportRecording          | 是否支持AI录音功能         |
 | isSupportDevicePasswordAuth | 是否支持设备密码认证       |
 | isSupportDeviceChallenge    | 是否支持设备身份认证(HMAC-SHA256挑战应答) |
 | isSupportSedentary          | 是否支持久坐提醒设置       |
@@ -281,6 +281,8 @@ DeviceFuncV2Model类属性定义:
 | isSupportCountControl | 是否支持计数识别开关与状态查询 |
 | isSupportPpgSampleRate | 是否支持PPG采样率设置与获取 |
 | isSupportCustomerModel | 是否支持客户型号设置与获取 |
+| isSupportCompositeMeasurement | 是否支持综合检测（3.2.2.1） |
+| isSupportCustomTextDisplay | 是否支持自定义字符显示与时长设置（3.2.1.35） |
 
 
 ##### 3.1.7 读取连接态 RSSI
@@ -1994,25 +1996,46 @@ DHBleSdk.getCustomerModel(object : CustomerModelCallback {
 })
 ```
 
+##### 3.2.1.35 字符显示与时长设置
+
+> 功能配置表属性：`isSupportCustomTextDisplay`。显示英文字母、数字或混合内容，并设置显示时长；再次调用时更新内容并重新计时。
+
+`fun showCustomText(text: String, durationSeconds: Int, callback: CustomStatusCallback)`
+
+| 参数 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| text | String | 显示内容，最多5个英文字母或数字；超出取前5个，不可为空 |
+| durationSeconds | Int | 显示时长，单位秒；小于1按1处理，大于255按255处理 |
+| callback | CustomStatusCallback | 设备接受指令后回调 `onSuccess()`，不等待显示结束；失败回调 `onFail(errorCode)` |
+
+内容无效时通过 `onFail(Constants.ERROR_INFO)` 返回。请等待前一次显示请求返回后再发起下一次。
+
+```kotlin
+if (supportMenu.isSupportCustomTextDisplay) {
+    DHBleSdk.showCustomText("A627", 5, object : CustomStatusCallback {
+        override fun onSuccess() {
+            Log.e("RWSDK", "字符显示设置成功")
+        }
+        override fun onFail(errorCode: Int) {
+            Log.e("RWSDK", "字符显示设置失败: $errorCode")
+        }
+    })
+}
+```
+
 #### 3.2.2 健康数据同步(实时单次与全天检测)
 
-> 健康数据检测有两种方式: 实时单次检测与全天检测。健康数据包括心率,血氧,压力,HRV,睡眠等, **睡眠无实时检测**。 
+> 健康数据检测有两种方式: 实时单次检测与全天检测。健康数据包括心率,血氧,压力,HRV,睡眠等, **睡眠无实时检测**。
 >
 > (1) 实时单次检测: APP侧启动设备进入单次检测,检测完后马上返回结果。
 >
 > (2) 全天检测: 可设置间隔时间,比如30分钟或60分钟设备会进行检测并保存值; **app一直不同步情况下,设备可保存3-6天的数据**。
 
+##### 3.2.2.0 实时检测-单项检测
 
-
-##### 3.2.2.1 实时检测-启动与关闭设备健康数据检测
-
-> 健康数据单次检测(心率,血氧,HRV,压力,血糖,血压,体温);
+> [!NOTE]
 >
-> 回调 `HealthMeasurementCallback`: onStarted(开始确认) → onData(测量中实时值, 多帧) → onFinished(测量结束/失败/超时);
-
-> [!CAUTION]
->
-> 同一时间只能开启一种健康检测类型, 必须等当前检测结束(收到 onFinished)或主动停止后, 才能启动新的检测类型. 同时开启多种会导致检测异常.
+> 启动或停止心率、血氧、HRV、压力、血糖、血压、体温中的一项检测。单项检测与综合检测不能同时进行，当前检测结束或主动停止后，再启动下一次检测。
 
 方法说明:
 
@@ -2038,6 +2061,10 @@ HealthDataType 类型说明:
 | STRESS         | 压力       |
 | BLOOD_SUGAR    | 血糖       |
 
+结果说明：通过 `onStarted()` 确认开始，`onData()` 接收实时值，`onFinished()` 接收整轮结束结果。收到实时值不代表检测结束。
+
+`onFinished(result)` 中，`result.isSuccess=true` 表示正常结束；未佩戴时为 `false`，且 `result.errorCode=Constants.ERROR_NOT_WORN`，需佩戴后重试；其他失败或超时通过 `result.errorCode` 判断。
+
 调用示例:
 
 ```kotlin
@@ -2054,16 +2081,82 @@ DHBleSdk.controlOpen(1, HealthDataType.HEART_RATE.code, object : HealthMeasureme
     override fun onFinished(result: HealthMeasurementResult) {
         if (result.isSuccess) {
             Log.e("RWSDK", "测量完成")
+        } else if (result.errorCode == Constants.ERROR_NOT_WORN) {
+            Log.e("RWSDK", "未佩戴，请佩戴后重试")
         } else {
             Log.e("RWSDK", "测量失败/超时: ${result.errorCode}")
         }
     }
 })
+```
 
-//停止心率检测(经 onFinished 收尾)
+如需提前停止，单独调用：
+
+```kotlin
 DHBleSdk.controlOpen(0, HealthDataType.HEART_RATE.code, object : HealthMeasurementCallback {
     override fun onStarted() = Unit
     override fun onData(data: HealthRealtimeValue) = Unit
+    override fun onFinished(result: HealthMeasurementResult) = Unit
+})
+```
+
+##### 3.2.2.1 实时检测-综合检测
+
+> 功能配置表属性：`isSupportCompositeMeasurement`。以设备实际返回的项目为准。综合检测与单项检测不能同时进行。
+
+方法说明：
+
+`fun controlCompositeMeasurement(type: Int, callback: CompositeMeasurementCallback)`
+
+参数说明：
+
+| 参数/回调 | 说明 |
+| --------- | ---- |
+| type | `1` 开始；`0` 停止 |
+| onStarted() | 设备已确认开始检测 |
+| onData(results) | `List<HealthRealtimeValue>`，一次返回本次上报的全部检测项目；各项按 `dataType` 区分，共用相同的 `timestamp` |
+| onFinished(result) | 整轮检测结束或失败：`result.isSuccess=true` 正常结束；`result.errorCode=Constants.ERROR_NOT_WORN` 未佩戴，需佩戴后重试；其他错误码表示失败。`result.dataType` 为 `HealthDataType.COMPOSITE.code` |
+
+结果字段说明：`results` 列表中每项为一个 `HealthRealtimeValue`。
+
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| dataType | Int | 检测类型，使用3.2.2.0单项检测参数表中的 `HealthDataType.code` 区分 |
+| timestamp | Long | Unix秒时间戳，同一次上报的各项共用相同时间戳 |
+| value | Double | 对应项目的数值；血压为收缩压 |
+| extraValue | Double | 血压为舒张压；其他项目为0 |
+
+收到数据不代表整轮检测结束，以 `onFinished()` 为准。
+
+调用示例：
+
+```kotlin
+if (supportMenu.isSupportCompositeMeasurement) {
+    DHBleSdk.controlCompositeMeasurement(1, object : CompositeMeasurementCallback {
+        override fun onStarted() = Unit
+        override fun onData(results: List<HealthRealtimeValue>) {
+            // results 为一次完整上报，按每项的 dataType 更新对应数据显示
+            results.forEach { item ->
+                Log.e("RWSDK", "type=${item.dataType}, time=${item.timestamp}, value=${item.value}, extra=${item.extraValue}")
+            }
+        }
+        override fun onFinished(result: HealthMeasurementResult) {
+            if (result.errorCode == Constants.ERROR_NOT_WORN) {
+                Log.e("RWSDK", "未佩戴，请佩戴后重试")
+            } else {
+                Log.e("RWSDK", "综合检测结束 success=${result.isSuccess}, error=${result.errorCode}")
+            }
+        }
+    })
+}
+```
+
+如需停止，单独调用：
+
+```kotlin
+DHBleSdk.controlCompositeMeasurement(0, object : CompositeMeasurementCallback {
+    override fun onStarted() = Unit
+    override fun onData(results: List<HealthRealtimeValue>) = Unit
     override fun onFinished(result: HealthMeasurementResult) = Unit
 })
 ```
@@ -3317,6 +3410,12 @@ DHBleSdk.getPpgSampleRate(object : PpgSampleRateCallback {
 
 ## SDK修订记录
 
+**v2.0.0_20261104** (2026.11.04)
+
+- 修复获取设备信息时客户型号 `customerModel` 无法正确读取的问题（3.2.1.3）。
+- 新增字符显示与时长设置接口 `showCustomText`（3.2.1.35），功能配置表新增 `isSupportCustomTextDisplay`。
+- 新增实时综合检测接口 `controlCompositeMeasurement`，支持一轮获取多项健康数据（3.2.2.1），功能配置表新增 `isSupportCompositeMeasurement`。
+
 **v2.0.0_20261028** (2026.10.28)
 
 - 新增PPG采样率设置与获取接口 `setPpgSampleRate`/`getPpgSampleRate`(5.2.5.4)，功能表新增 `isSupportPpgSampleRate`
@@ -3349,7 +3448,7 @@ DHBleSdk.getPpgSampleRate(object : PpgSampleRateCallback {
 - 添加设备身份认证接口(3.2.1.26.4), 功能配置表添加`isSupportDeviceChallenge`
 - 添加久坐提醒设置与获取接口(3.2.1.29), 功能配置表添加`isSupportSedentary`
 - 添加喝水提醒设置与获取接口(3.2.1.30), 功能配置表添加`isDrink`
-- 添加健康监测(全天检测)统一设置接口 `setHealthMonitor`/`getHealthMonitor`(3.2.2.2)与单次实时检测接口 `controlOpen`(3.2.2.1); 旧接口保留可用
+- 添加健康监测(全天检测)统一设置接口 `setHealthMonitor`/`getHealthMonitor`(3.2.2.2)与单次实时检测接口 `controlOpen`(3.2.2.0); 旧接口保留可用
 
 **v2.0.0_20260909** (2026.09.09)
 

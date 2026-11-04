@@ -42,6 +42,15 @@
             android:layout_marginTop="3dp"
             android:textColor="#8A94A6"
             android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/setting_expanded_value"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="#172033"
+            android:textSize="14sp"
+            android:visibility="gone" />
     </LinearLayout>
 
     <TextView

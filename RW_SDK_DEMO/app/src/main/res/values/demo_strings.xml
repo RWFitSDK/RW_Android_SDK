@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="demo_composite_measurement">Composite measurement</string>
+    <string name="demo_composite_measurement_desc">Measure multiple health items in one session (excludes SpO₂)</string>
+    <string name="demo_composite_start">Start measurement</string>
+    <string name="demo_composite_stop">Stop measurement</string>
+    <string name="demo_composite_measuring">Measuring…</string>
+    <string name="demo_composite_finished">Measurement finished</string>
+    <string name="demo_measurement_not_worn">Ring not worn. Please put it on and try again.</string>
+    <string name="demo_composite_busy">Wait for the current measurement to finish, or stop it first</string>
     <string name="demo_ppg_sample_rate">PPG sample rate</string>
     <string name="demo_ppg_sample_rate_desc">Read or set the sample rate in Hz; requires firmware support</string>
     <string name="demo_ppg_sample_rate_hint">Sample rate in Hz, e.g. 100 or 200</string>
@@ -7,6 +15,10 @@
     <string name="demo_customer_model">Customer model</string>
     <string name="demo_customer_model_desc">Read or set the customer-defined model</string>
     <string name="demo_customer_model_hint">Enter the customer model</string>
+    <string name="demo_device_name">Set device name</string>
+    <string name="demo_device_name_desc">Change the device Bluetooth name</string>
+    <string name="demo_device_name_hint">Enter the device name</string>
+    <string name="demo_device_name_invalid">Enter a name of 1–24 UTF-8 bytes</string>
     <string name="demo_setting_read">Read current value</string>
     <string name="demo_setting_write">Set value</string>
     <string name="demo_setting_empty_value">Empty</string>
@@ -276,6 +288,10 @@
     <string name="demo_custom_number_desc">Show a number from 0–9999 for 3 seconds</string>
     <string name="demo_custom_number_hint">0–9999</string>
     <string name="demo_custom_number_show">Show</string>
+    <string name="demo_custom_text_display">Custom text display</string>
+    <string name="demo_custom_text_desc">Display up to 5 letters or digits for a specified duration</string>
+    <string name="demo_custom_text_hint">Enter 1–5 English letters or digits</string>
+    <string name="demo_custom_text_duration_hint">Duration in seconds (1–255)</string>
     <string name="demo_count_control">Counting recognition</string>
     <string name="demo_count_control_desc">Read, enable or disable; state updates from device pushes</string>
     <string name="demo_count_control_unknown">Not read</string>
