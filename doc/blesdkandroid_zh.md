@@ -2390,7 +2390,7 @@ DHBleSdk.syncHealthDataByType(Constants.RingHealthType.TODAY_STEP, this)
 
 > [!CAUTION]
 >
-> 返回设备中保存的多天睡眠状态数据.
+> 返回设备中保存的睡眠数据，每段夜睡或小睡分别返回一条记录；可包含多天数据，小睡需固件支持.
 
 `SleepSyncBean` 字段:
 
@@ -2402,6 +2402,7 @@ DHBleSdk.syncHealthDataByType(Constants.RingHealthType.TODAY_STEP, this)
 | awakeTime | long | 醒来时间戳, Unix秒 |
 | itemCount | int | 睡眠状态明细数量 |
 | items | `List<SleepItemBean>` | 睡眠状态明细 |
+| sleepCategory | int | 睡眠类别：`0` 夜睡，`1` 小睡（如午睡） |
 
 `SleepItemBean` 字段:
 
@@ -3409,6 +3410,10 @@ DHBleSdk.getPpgSampleRate(object : PpgSampleRateCallback {
 ```
 
 ## SDK修订记录
+
+**v2.0.0_20261105** (2026.11.05)
+
+- 新增小睡数据支持，睡眠记录新增 `sleepCategory` 区分夜睡与小睡（3.2.2.4.4）。
 
 **v2.0.0_20261104** (2026.11.04)
 

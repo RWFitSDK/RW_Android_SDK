@@ -2369,7 +2369,7 @@ Callback: `onSyncSleep(List<SleepSyncBean> data)`
 
 > [!CAUTION]
 >
-> Returns multiple days of sleep state data stored on the device.
+> Returns sleep data stored on the device, with a separate record for each night sleep or nap session. Data may span multiple days. Nap support requires compatible firmware.
 
 `SleepSyncBean` fields:
 
@@ -2381,6 +2381,7 @@ Callback: `onSyncSleep(List<SleepSyncBean> data)`
 | awakeTime | long | Wake-up timestamp in Unix seconds |
 | itemCount | int | Number of sleep state details |
 | items | `List<SleepItemBean>` | Sleep state details |
+| sleepCategory | int | Sleep category: `0` night sleep, `1` nap |
 
 `SleepItemBean` fields:
 
@@ -3364,6 +3365,10 @@ DHBleSdk.getPpgSampleRate(object : PpgSampleRateCallback {
 ```
 
 ## SDK Revision History
+
+**V2.0.0_20261105** (2026.11.05)
+
+- Added nap support and the `sleepCategory` field to distinguish night sleep from naps (3.2.2.4.4).
 
 **V2.0.0_20261104** (2026.11.04)
 
