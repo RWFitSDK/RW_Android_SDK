@@ -30,6 +30,7 @@ import com.example.blesdk.callback.data.HealthRealtimeValue
 import com.example.blesdk.blering.HealthDataType
 import com.example.blesdk.callback.data.FirmwareCallback
 import com.example.blesdk.callback.data.PowerCallback
+import com.example.blesdk.callback.data.ActigraphyCallback
 import com.example.blesdk.callback.data.TakePhotoCallback
 import com.example.blesdk.callback.status.MusicPushSettingCallback
 import com.example.blesdk.utils.Constants
@@ -46,11 +47,18 @@ data class DemoUiState(
     val connecting: Boolean = false,
     val connectionMessage: String = "",
     val battery: Int? = null,
+    val chargingStatus: Int? = null,
     val firmwareVersion: String? = null,
     val countArmed: Boolean? = null,
     val deviceModel: String? = null,
+    val deviceForm: Int = -1,
+    val deviceBodyColor: Int = -1,
+    val deviceSize: Int = -1,
+    val customerModel: String? = null,
     val syncing: Boolean = false,
     val syncProgress: Int = 0,
+    val actigraphySyncing: Boolean = false,
+    val actigraphyStatus: String? = null,
     val activeMeasurement: DemoHealthType? = null,
     val compositeMeasurementRunning: Boolean = false,
     val compositeMeasurementText: String? = null,
@@ -66,6 +74,7 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
     private var appContext: Context? = null
     private var callbacksSubscribed = false
     private val stepDays = linkedMapOf<String, StepDayData>()
+    private var actigraphyCallback: ActigraphyCallback? = null
 
     @Volatile
     var state: DemoUiState = DemoUiState()
@@ -85,7 +94,7 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
                 }
                 DevicePushType.POWER -> {
                     val powerBean = data.value as? PowerBean ?: return
-                    mainHandler.post { update { it.copy(battery = powerBean.power) } }
+                    updateBattery(powerBean, "push")
                 }
                 DevicePushType.COUNT_CONTROL -> {
                     val armed = data.value as? Boolean ?: return
@@ -186,14 +195,18 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
     }
 
     fun disconnect() {
+        actigraphyCallback = null
         update {
             it.copy(
                 connected = false,
                 ready = false,
+                chargingStatus = null,
                 connecting = false,
                 connectionMessage = text(R.string.demo_disconnected),
                 syncing = false,
                 syncProgress = 0,
+                actigraphySyncing = false,
+                actigraphyStatus = if (it.actigraphySyncing) text(R.string.demo_sync_failed, Constants.ERROR_DEVICE_UN_CONNECT) else it.actigraphyStatus,
                 activeMeasurement = null,
                 compositeMeasurementRunning = false,
                 compositeMeasurementText = null
@@ -203,6 +216,7 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
     }
 
     fun forgetDevice() {
+        actigraphyCallback = null
         appContext?.let { SavedDeviceStore.clear(it) }
         XXApplication.instance.currentConnectDevcie = null
         XXApplication.instance.currentSupportMenuBean = null
@@ -217,6 +231,39 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
         stepDays.clear()
         update { it.copy(syncing = true, syncProgress = 0) }
         DHBleSdk.syncAllHealthData(this)
+    }
+
+    fun syncActigraphy() {
+        if (!state.ready || !DemoHealthType.ACTIGRAPHY.isSupported(state.supportMenu) || state.actigraphySyncing) return
+        update { it.copy(actigraphySyncing = true, actigraphyStatus = text(R.string.demo_actigraphy_syncing)) }
+        val callback = object : ActigraphyCallback {
+            override fun onSuccess() = Unit
+            override fun onResult(data: List<ActigraphySyncBean>?) {
+                if (actigraphyCallback !== this) return
+                actigraphyCallback = null
+                val groups = data.orEmpty()
+                val records = actigraphyDetailRecords(groups) { text(R.string.demo_actigraphy_valid_count, it) }
+                val status = text(R.string.demo_actigraphy_sync_complete, groups.size, groups.sumOf { it.validCount })
+                Log.e("RWSDK", "Actigraphy sync complete groups=${groups.size} values=${groups.sumOf { it.validCount }}")
+                update { current ->
+                    val summaries = current.summaryValues.toMutableMap()
+                    if (records.isEmpty()) summaries.remove(DemoHealthType.ACTIGRAPHY.id)
+                    else summaries[DemoHealthType.ACTIGRAPHY.id] = DemoHealthRecord(records.first().timestampSeconds,
+                        text(R.string.demo_actigraphy_group_count, groups.size), status)
+                    current.copy(actigraphySyncing = false, actigraphyStatus = status,
+                        summaryValues = summaries,
+                        records = current.records + (DemoHealthType.ACTIGRAPHY.id to records))
+                }
+            }
+            override fun onFail(errorCode: Int) {
+                if (actigraphyCallback !== this) return
+                actigraphyCallback = null
+                Log.e("RWSDK", "Actigraphy sync failed error=$errorCode")
+                update { it.copy(actigraphySyncing = false, actigraphyStatus = text(R.string.demo_sync_failed, errorCode)) }
+            }
+        }
+        actigraphyCallback = callback
+        DHBleSdk.syncActigraphy(callback)
     }
 
     fun startMeasurement(type: DemoHealthType) {
@@ -311,7 +358,7 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
         if (!state.ready) return
         val powerCallback = object : PowerCallback {
             override fun onResult(data: PowerBean?) {
-                data?.let { value -> update { it.copy(battery = value.power) } }
+                data?.let { value -> updateBattery(value, "query") }
                 DHBleSdk.dispose(this)
             }
             override fun onSuccess() = Unit
@@ -321,7 +368,9 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
             override fun onResult(data: FirmVersionBean?) {
                 data?.let { value ->
                     Log.e("RWSDK", "getFirmwareVersionJL deviceNo=${value.deviceNo} deviceClazz=${value.deviceClazz} customerModel=${value.customerModel}")
-                    update { it.copy(firmwareVersion = value.deviceNo, deviceModel = value.deviceClazz) }
+                    update { it.copy(firmwareVersion = value.deviceNo, deviceModel = value.deviceClazz,
+                        deviceForm = value.deviceForm, deviceBodyColor = value.deviceBodyColor, deviceSize = value.deviceSize,
+                        customerModel = value.customerModel) }
                 }
                 DHBleSdk.dispose(this)
             }
@@ -334,8 +383,24 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
         DHBleSdk.getFirmwareVersionJL()
     }
 
+    private fun updateBattery(value: PowerBean, source: String) {
+        val battery = value.power
+        val charging = value.powerStatus
+        val voltage = value.voltage
+        val label = when (charging) { 0 -> "未充电"; 1 -> "充电中"; else -> "未知" }
+        Log.e("DemoBattery", "source=$source battery=$battery% voltage=${voltage}mV chargingStatus=$charging($label)")
+        mainHandler.post {
+            if (state.connected) update { it.copy(battery = battery, chargingStatus = charging) }
+        }
+    }
+
     override fun onRingConnecting(device: BleDevice?) {
-        update { it.copy(device = device ?: it.device, countArmed = null, connecting = true, connectionMessage = text(R.string.demo_connecting)) }
+        actigraphyCallback = null
+        update { it.copy(device = device ?: it.device, countArmed = null, connecting = true,
+            actigraphySyncing = false, actigraphyStatus = null,
+            battery = null, chargingStatus = null,
+            deviceForm = -1, deviceBodyColor = -1, deviceSize = -1, customerModel = null,
+            connectionMessage = text(R.string.demo_connecting)) }
     }
 
     override fun onRingConnected(device: BleDevice?) {
@@ -346,19 +411,25 @@ object DemoStateStore : RingConnectBleCallback, HealthDataSyncCallback {
         }
         update {
             it.copy(device = connectedDevice, countArmed = null, compositeMeasurementRunning = false,
+                battery = null, chargingStatus = null,
+                deviceForm = -1, deviceBodyColor = -1, deviceSize = -1, customerModel = null,
                 compositeMeasurementText = null, connected = true, ready = false, connecting = true,
                 connectionMessage = text(R.string.demo_initializing))
         }
     }
 
     override fun onRingConnectFailed(device: BleDevice?, reason: RingBleError) {
+        actigraphyCallback = null
         update {
             it.copy(
                 connected = false,
                 ready = false,
+                chargingStatus = null,
                 connecting = false,
                 syncing = false,
                 syncProgress = 0,
+                actigraphySyncing = false,
+                actigraphyStatus = if (it.actigraphySyncing) text(R.string.demo_sync_failed, Constants.ERROR_DEVICE_UN_CONNECT) else it.actigraphyStatus,
                 activeMeasurement = null,
                 compositeMeasurementRunning = false,
                 compositeMeasurementText = null,

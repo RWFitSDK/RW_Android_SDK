@@ -23,7 +23,8 @@ enum class DemoHealthType(
     TEMPERATURE("temperature", R.string.demo_health_temperature, "℃", HealthDataType.TEMPERATURE.code),
     MUSLIM_COUNT("muslim_count", R.string.demo_health_muslim_count, "times"),
     WORKOUT("workout", R.string.demo_multi_sport, ""),
-    RECORDING("recording", R.string.demo_recording, "");
+    RECORDING("recording", R.string.demo_recording, ""),
+    ACTIGRAPHY("actigraphy", R.string.demo_health_actigraphy, "");
 
     fun isSupported(menu: SupportMenuBean?): Boolean {
         menu ?: return false
@@ -40,6 +41,7 @@ enum class DemoHealthType(
             MUSLIM_COUNT -> menu.isMuslimCountData
             WORKOUT -> menu.isNewSport
             RECORDING -> menu.isSupportRecording
+            ACTIGRAPHY -> menu.isSupportActigraphy
         }
     }
 

@@ -144,6 +144,18 @@
             <TextView android:id="@+id/model_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#172033" android:textSize="16sp" />
             <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="@string/demo_firmware_version" android:textColor="#8A94A6" />
             <TextView android:id="@+id/firmware_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#172033" android:textSize="16sp" />
+            <LinearLayout android:id="@+id/firmware_form_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="vertical" android:visibility="gone">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/demo_device_form" android:textColor="#8A94A6" />
+                <TextView android:id="@+id/firmware_form_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#172033" android:textSize="16sp" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/firmware_color_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="vertical" android:visibility="gone">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/demo_device_body_color" android:textColor="#8A94A6" />
+                <TextView android:id="@+id/firmware_color_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#172033" android:textSize="16sp" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/firmware_customer_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="vertical" android:visibility="gone">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/demo_customer_model" android:textColor="#8A94A6" />
+                <TextView android:id="@+id/firmware_customer_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#172033" android:textSize="16sp" />
+            </LinearLayout>
         </LinearLayout>
 
         <TextView

@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="demo_health_actigraphy">体动记录</string>
+    <string name="demo_actigraphy_sync">同步体动记录</string>
+    <string name="demo_actigraphy_syncing">正在同步体动记录…</string>
+    <string name="demo_actigraphy_sync_hint">点击同步获取体动历史，每30秒一项，每15分钟一组。</string>
+    <string name="demo_actigraphy_detail_empty">暂无体动记录，请点击上方同步按钮</string>
+    <string name="demo_actigraphy_sync_complete">同步完成：%1$d组，共%2$d个有效值</string>
+    <string name="demo_actigraphy_valid_count">有效值：%1$d/30</string>
+    <string name="demo_actigraphy_group_count">%1$d组</string>
     <string name="demo_composite_measurement">综合检测</string>
     <string name="demo_composite_measurement_desc">一轮检测多项健康数据（不含血氧）</string>
     <string name="demo_composite_start">开始检测</string>
@@ -15,6 +23,21 @@
     <string name="demo_customer_model">客户型号</string>
     <string name="demo_customer_model_desc">获取或设置客户自定义型号</string>
     <string name="demo_customer_model_hint">请输入客户型号</string>
+    <string name="demo_device_body_color">外观颜色</string>
+    <string name="demo_device_size">设备尺寸</string>
+    <string name="demo_device_size_desc">获取或设置设备尺寸</string>
+    <string name="demo_device_size_hint">输入尺寸号，如9；0表示未设置</string>
+    <string name="demo_device_size_unset">尺寸未设置</string>
+    <string name="demo_device_size_value">%1$d号</string>
+    <string name="demo_device_body_color_desc">获取或设置设备外观颜色</string>
+    <string name="demo_vibration_switch">震动总开关</string>
+    <string name="demo_vibration_switch_desc">获取或设置设备震动总开关</string>
+    <string name="demo_body_color_unset">未设置</string>
+    <string name="demo_body_color_black">黑色</string>
+    <string name="demo_body_color_pink">粉色</string>
+    <string name="demo_body_color_red">红色</string>
+    <string name="demo_body_color_silver">银色</string>
+    <string name="demo_body_color_gold">金色</string>
     <string name="demo_device_name">设置名字</string>
     <string name="demo_device_name_desc">修改设备蓝牙名称</string>
     <string name="demo_device_name_hint">请输入设备名称</string>
@@ -31,6 +54,7 @@
     <string name="demo_device_form_watch">手表</string>
     <string name="demo_battery_not_charging">未充电</string>
     <string name="demo_battery_charging">充电中</string>
+    <string name="demo_battery_status_unknown">未知（%1$d）</string>
     <string name="demo_battery_full">充满</string>
     <string name="demo_health">健康</string>
     <string name="demo_device">设备</string>
@@ -48,6 +72,7 @@
     <string name="demo_device_info">设备信息</string>
     <string name="demo_battery">电量</string>
     <string name="demo_device_model">设备型号</string>
+    <string name="demo_device_form">产品形态</string>
     <string name="demo_firmware_version">固件版本</string>
     <string name="demo_device_features">设备功能 · 按功能表显示</string>
     <string name="demo_settings_empty">连接并获取功能表后显示设备设置</string>

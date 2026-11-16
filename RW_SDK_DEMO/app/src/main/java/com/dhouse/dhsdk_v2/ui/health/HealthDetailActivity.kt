@@ -32,6 +32,14 @@ class HealthDetailActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { finish() }
         binding.detailList.layoutManager = LinearLayoutManager(this)
         binding.detailList.adapter = adapter
+        if (type == DemoHealthType.ACTIGRAPHY) {
+            // 体动可包含多天记录，限制列表视口并保留滚动复用，不一次性铺开全部分组。
+            binding.detailList.layoutParams = binding.detailList.layoutParams.apply {
+                height = (resources.displayMetrics.heightPixels / 2)
+                    .coerceAtLeast((240 * resources.displayMetrics.density).toInt())
+            }
+            binding.detailList.isNestedScrollingEnabled = true
+        }
 
         binding.measurementAction.setOnClickListener {
             val state = DemoStateStore.state
@@ -42,6 +50,13 @@ class HealthDetailActivity : AppCompatActivity() {
             } else {
                 state.activeMeasurement?.let { DemoStateStore.stopMeasurement(it) }
                 DemoStateStore.startMeasurement(type)
+            }
+        }
+        binding.actigraphySyncAction.setOnClickListener {
+            if (!DemoStateStore.state.ready) {
+                Toast.makeText(this, R.string.demo_connect_first, Toast.LENGTH_SHORT).show()
+            } else {
+                DemoStateStore.syncActigraphy()
             }
         }
         removeObserver = DemoStateStore.observe(::render)
@@ -65,6 +80,16 @@ class HealthDetailActivity : AppCompatActivity() {
             ).maxByOrNull { it.timestampSeconds }
         binding.latestValue.text = latest?.value ?: getString(R.string.demo_no_data)
         binding.latestDescription.text = latest?.detail ?: getString(R.string.demo_sync_or_measure)
+        val isActigraphy = type == DemoHealthType.ACTIGRAPHY
+        binding.actigraphySyncSection.visibility = if (isActigraphy) View.VISIBLE else View.GONE
+        if (isActigraphy) {
+            binding.actigraphySyncProgress.visibility = if (state.actigraphySyncing) View.VISIBLE else View.GONE
+            binding.actigraphySyncStatus.text = state.actigraphyStatus ?: getString(R.string.demo_actigraphy_sync_hint)
+            binding.actigraphySyncAction.isEnabled = state.ready && type.isSupported(state.supportMenu) && !state.actigraphySyncing
+            binding.actigraphySyncAction.setText(if (state.actigraphySyncing) R.string.demo_actigraphy_syncing else R.string.demo_actigraphy_sync)
+            if (latest == null) binding.latestDescription.setText(R.string.demo_actigraphy_sync_hint)
+        }
+        binding.emptyDetail.setText(if (isActigraphy) R.string.demo_actigraphy_detail_empty else R.string.demo_detail_empty)
         binding.emptyDetail.visibility = if (records.isEmpty()) View.VISIBLE else View.GONE
         val supportsMeasurement = type.measurementDataType != null
         binding.measurementSection.visibility = if (supportsMeasurement) View.VISIBLE else View.GONE

@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="demo_health_actigraphy">Actigraphy</string>
+    <string name="demo_actigraphy_sync">Sync actigraphy</string>
+    <string name="demo_actigraphy_syncing">Syncing actigraphy…</string>
+    <string name="demo_actigraphy_sync_hint">Tap Sync to read actigraphy history. One value every 30 seconds, grouped into 15-minute intervals.</string>
+    <string name="demo_actigraphy_detail_empty">No actigraphy records. Tap the sync button above.</string>
+    <string name="demo_actigraphy_sync_complete">Sync complete: %1$d groups, %2$d values</string>
+    <string name="demo_actigraphy_valid_count">Valid values: %1$d/30</string>
+    <string name="demo_actigraphy_group_count">%1$d groups</string>
     <string name="demo_composite_measurement">Composite measurement</string>
     <string name="demo_composite_measurement_desc">Measure multiple health items in one session (excludes SpO₂)</string>
     <string name="demo_composite_start">Start measurement</string>
@@ -15,6 +23,21 @@
     <string name="demo_customer_model">Customer model</string>
     <string name="demo_customer_model_desc">Read or set the customer-defined model</string>
     <string name="demo_customer_model_hint">Enter the customer model</string>
+    <string name="demo_device_body_color">Body color</string>
+    <string name="demo_device_size">Device size</string>
+    <string name="demo_device_size_desc">Read or set the device size</string>
+    <string name="demo_device_size_hint">Enter a size, e.g. 9; 0 means not set</string>
+    <string name="demo_device_size_unset">Size not set</string>
+    <string name="demo_device_size_value">Size %1$d</string>
+    <string name="demo_device_body_color_desc">Read or set the device body color</string>
+    <string name="demo_vibration_switch">Vibration master switch</string>
+    <string name="demo_vibration_switch_desc">Read or set the device vibration master switch</string>
+    <string name="demo_body_color_unset">Not set</string>
+    <string name="demo_body_color_black">Black</string>
+    <string name="demo_body_color_pink">Pink</string>
+    <string name="demo_body_color_red">Red</string>
+    <string name="demo_body_color_silver">Silver</string>
+    <string name="demo_body_color_gold">Gold</string>
     <string name="demo_device_name">Set device name</string>
     <string name="demo_device_name_desc">Change the device Bluetooth name</string>
     <string name="demo_device_name_hint">Enter the device name</string>
@@ -31,6 +54,7 @@
     <string name="demo_device_form_watch">Watch</string>
     <string name="demo_battery_not_charging">Not charging</string>
     <string name="demo_battery_charging">Charging</string>
+    <string name="demo_battery_status_unknown">Unknown (%1$d)</string>
     <string name="demo_battery_full">Fully charged</string>
     <string name="demo_health">Health</string>
     <string name="demo_device">Device</string>
@@ -48,6 +72,7 @@
     <string name="demo_device_info">Device information</string>
     <string name="demo_battery">Battery</string>
     <string name="demo_device_model">Device model</string>
+    <string name="demo_device_form">Product form</string>
     <string name="demo_firmware_version">Firmware version</string>
     <string name="demo_device_features">Device features · based on capability table</string>
     <string name="demo_settings_empty">Connect and load the capability table to show settings</string>

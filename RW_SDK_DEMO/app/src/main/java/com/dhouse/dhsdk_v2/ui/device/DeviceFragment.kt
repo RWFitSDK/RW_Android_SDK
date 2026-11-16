@@ -123,6 +123,9 @@ class DeviceFragment : Fragment() {
         if (!state.ready) {
             settingValues.remove("ppg_sample_rate")
             settingValues.remove("customer_model")
+            settingValues.remove("device_body_color")
+            settingValues.remove("vibration_switch")
+            settingValues.remove("device_size")
             settingValues.remove("bt_name")
             settingValues.remove("custom_text_display")
             btNameCallback?.let(DHBleSdk::dispose)
@@ -134,9 +137,24 @@ class DeviceFragment : Fragment() {
             ?: getString(R.string.demo_unbound_device)
         binding.deviceAddress.text = device?.bleMac?.takeIf { it.isNotBlank() } ?: "--"
         binding.connectionState.text = state.connectionMessage
-        binding.powerValue.text = state.battery?.let { "$it%" } ?: "--"
+        val charging = state.chargingStatus?.let { status ->
+            batteryChargingStatusRes(status)?.let { getString(it) }
+                ?: getString(R.string.demo_battery_status_unknown, status)
+        }
+        binding.powerValue.text = listOfNotNull(state.battery?.let { "$it%" }, charging)
+            .joinToString(" · ").ifEmpty { "--" }
         binding.modelValue.text = state.deviceModel ?: "--"
         binding.firmwareValue.text = state.firmwareVersion ?: "--"
+        val formRes = deviceFormRes(state.deviceForm)
+        binding.firmwareFormRow.visibility = if (formRes != null) View.VISIBLE else View.GONE
+        binding.firmwareFormValue.text = formRes?.let { getString(it) }.orEmpty()
+        val colorRes = deviceBodyColorRes(state.deviceBodyColor)
+        binding.firmwareColorRow.visibility = if (colorRes != null) View.VISIBLE else View.GONE
+        binding.firmwareColorValue.text = colorRes?.let { getString(it) }.orEmpty()
+        val customerModel = customerModelForDisplay(state.customerModel,
+            state.supportMenu?.isSupportCustomerModel == true)
+        binding.firmwareCustomerRow.visibility = if (customerModel != null) View.VISIBLE else View.GONE
+        binding.firmwareCustomerValue.text = customerModel.orEmpty()
         binding.reconnectDevice.visibility = if (device != null && !state.connected) View.VISIBLE else View.GONE
         binding.reconnectDevice.isEnabled = !state.connecting
         binding.disconnectDevice.visibility = if (device != null && state.connected) View.VISIBLE else View.GONE
@@ -149,6 +167,9 @@ class DeviceFragment : Fragment() {
             } else if (item.id == "count_control") {
                 item.copy(valueText = state.countArmed?.let(::countControlStateText)
                     ?: getString(R.string.demo_count_control_unknown))
+            } else if (item.id == "device_size") {
+                item.copy(valueText = settingValues[item.id]
+                    ?: state.deviceSize.takeIf { it in 0..255 }?.let(::deviceSizeText) ?: item.valueText)
             } else settingValues[item.id]?.let { item.copy(valueText = it) } ?: item
         }
         adapter.submit(settings)
@@ -217,6 +238,9 @@ class DeviceFragment : Fragment() {
             "custom_number_display" -> showCustomNumberInput(item.id)
             "custom_text_display" -> showCustomTextInput(item.id)
             "ppg_sample_rate", "customer_model" -> showFirmwareSetting(item.id)
+            "device_body_color" -> showDeviceBodyColor()
+            "vibration_switch" -> showVibrationSwitch()
+            "device_size" -> showDeviceSize()
             "bt_name" -> showDeviceNameInput(item.id)
             "raise_to_wake" -> editTimeRange(getString(R.string.demo_raise_to_wake), 8, 0, 20, 0) { enabled, sh, sm, eh, em ->
                 val callback = object : BrightCallback {
@@ -896,6 +920,134 @@ class DeviceFragment : Fragment() {
             }
         }
         dialog.show()
+    }
+
+    private fun showVibrationSwitch() {
+        val mac = DemoStateStore.state.device?.bleMac
+        choose(getString(R.string.demo_vibration_switch), arrayOf(
+            getString(R.string.demo_setting_read),
+            getString(R.string.demo_enabled),
+            getString(R.string.demo_disabled)
+        )) { index ->
+            if (!isCurrentDeviceTarget(mac)) return@choose
+            if (index == 0) {
+                Log.e("RWSDK", "getVibrationSwitch request")
+                DHBleSdk.getVibrationSwitch(object : VibrationSwitchCallback {
+                    override fun onSuccess() = Unit
+                    override fun onResult(data: Boolean?) {
+                        Log.e("RWSDK", "getVibrationSwitch result=$data")
+                        if (data != null) updateVibrationSwitchValue(mac, data)
+                    }
+                    override fun onFail(errorCode: Int) =
+                        firmwareSettingFailed("vibration_switch", mac, errorCode)
+                })
+            } else {
+                val enabled = index == 1
+                Log.e("RWSDK", "setVibrationSwitch request enabled=$enabled")
+                DHBleSdk.setVibrationSwitch(enabled, object : CustomStatusCallback {
+                    override fun onSuccess() {
+                        Log.e("RWSDK", "setVibrationSwitch success enabled=$enabled")
+                        updateVibrationSwitchValue(mac, enabled)
+                    }
+                    override fun onFail(errorCode: Int) =
+                        firmwareSettingFailed("vibration_switch", mac, errorCode)
+                })
+            }
+        }
+    }
+
+    private fun updateVibrationSwitchValue(mac: String?, enabled: Boolean) {
+        if (!isCurrentDeviceTarget(mac)) return
+        updateSettingValue("vibration_switch", getString(
+            if (enabled) R.string.demo_enabled else R.string.demo_disabled))
+    }
+
+    private fun deviceSizeText(size: Int): String = getString(
+        if (size == 0) R.string.demo_device_size_unset else R.string.demo_device_size_value, size)
+
+    private fun showDeviceSize() {
+        val mac = DemoStateStore.state.device?.bleMac
+        choose(getString(R.string.demo_device_size), arrayOf(
+            getString(R.string.demo_setting_read), getString(R.string.demo_setting_write))) { action ->
+            if (!isCurrentDeviceTarget(mac)) return@choose
+            if (action == 0) {
+                DHBleSdk.getDeviceSize(object : DeviceSizeCallback {
+                    override fun onSuccess() = Unit
+                    override fun onResult(data: Int?) {
+                        Log.e("RWSDK", "getDeviceSize result=$data")
+                        if (isCurrentDeviceTarget(mac) && data != null) {
+                            updateSettingValue("device_size", deviceSizeText(data))
+                        }
+                    }
+                    override fun onFail(errorCode: Int) = firmwareSettingFailed("device_size", mac, errorCode)
+                })
+            } else {
+                val input = EditText(requireContext()).apply {
+                    inputType = InputType.TYPE_CLASS_NUMBER
+                    isSingleLine = true
+                    setHint(R.string.demo_device_size_hint)
+                }
+                val dialog = AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.demo_device_size).setView(input)
+                    .setNegativeButton(R.string.demo_cancel, null)
+                    .setPositiveButton(R.string.demo_confirm, null).create()
+                firmwareSettingDialog = dialog
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val size = input.text.toString().toIntOrNull()
+                        if (size == null) {
+                            input.error = getString(R.string.demo_device_size_hint)
+                            return@setOnClickListener
+                        }
+                        if (!isCurrentDeviceTarget(mac)) { dialog.dismiss(); return@setOnClickListener }
+                        val normalized = size.coerceIn(0, 255)
+                        Log.e("RWSDK", "setDeviceSize request size=$normalized")
+                        DHBleSdk.setDeviceSize(normalized, object : CustomStatusCallback {
+                            override fun onSuccess() {
+                                if (isCurrentDeviceTarget(mac)) updateSettingValue("device_size", deviceSizeText(normalized))
+                            }
+                            override fun onFail(errorCode: Int) = firmwareSettingFailed("device_size", mac, errorCode)
+                        })
+                        dialog.dismiss()
+                    }
+                }
+                dialog.show()
+            }
+        }
+    }
+
+    private fun showDeviceBodyColor() {
+        val mac = DemoStateStore.state.device?.bleMac
+        val colors = (0..5).map { getString(requireNotNull(deviceBodyColorRes(it))) }
+        val labels = listOf(getString(R.string.demo_setting_read)) + colors
+        choose(getString(R.string.demo_device_body_color), labels.toTypedArray()) { index ->
+            if (!isCurrentDeviceTarget(mac)) return@choose
+            if (index == 0) {
+                Log.e("RWSDK", "getDeviceBodyColor request")
+                DHBleSdk.getDeviceBodyColor(object : DeviceBodyColorCallback {
+                    override fun onSuccess() = Unit
+                    override fun onResult(data: Int?) {
+                        Log.e("RWSDK", "getDeviceBodyColor result=$data")
+                        if (!isCurrentDeviceTarget(mac)) return
+                        val nameRes = data?.let(::deviceBodyColorRes) ?: return
+                        updateSettingValue("device_body_color", getString(nameRes))
+                    }
+                    override fun onFail(errorCode: Int) =
+                        firmwareSettingFailed("device_body_color", mac, errorCode)
+                })
+            } else {
+                val color = index - 1
+                Log.e("RWSDK", "setDeviceBodyColor request color=$color")
+                DHBleSdk.setDeviceBodyColor(color, object : CustomStatusCallback {
+                    override fun onSuccess() {
+                        Log.e("RWSDK", "setDeviceBodyColor success color=$color")
+                        if (isCurrentDeviceTarget(mac)) updateSettingValue("device_body_color", colors[color])
+                    }
+                    override fun onFail(errorCode: Int) =
+                        firmwareSettingFailed("device_body_color", mac, errorCode)
+                })
+            }
+        }
     }
 
     private fun showFirmwareSetting(settingId: String) {

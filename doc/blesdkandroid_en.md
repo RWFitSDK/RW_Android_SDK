@@ -159,6 +159,8 @@ Main properties of the `BleDevice` scan result:
 | bleDeviceId | String | Device model identifier, not a unique device serial number; empty if unavailable |
 | batteryStatus | int | Charging status: `0` not charging, `1` charging, `2` full; `-1` unavailable or unsupported. Requires device firmware support |
 | deviceForm | int | Product form: `0` ring without a screen, `1` ring with a screen, `2` bracelet without a screen, `3` bracelet with a screen, `4` wristband without a screen, `5` wristband with a screen, `6` watch; `-1` unavailable or unsupported. Requires device firmware support |
+| deviceBodyColor | int | Device body color: `0` not set, `1` black, `2` pink, `3` red, `4` silver, `5` gold; `-1` unavailable or unsupported. Requires device firmware support |
+| deviceSize | int | Device size number, e.g. `9` for size 9 or `10` for size 10; `0` not set, `-1` unavailable or unsupported. Requires device firmware support |
 
 > `batteryStatus` is not a battery percentage. Read the battery level after connecting; see [3.2.1.4 Get Battery Level](#3214-get-battery-level).
 
@@ -229,17 +231,23 @@ interface RingConnectBleCallback {
 
 ##### 3.1.6 Equipment Function Configuration Table
 
->   [!IMPORTANT]
+> [!IMPORTANT]
 >
->  Due to the variety of device models and their differing supported features, a feature list has been introduced to allow users to check the supported features of each device.  Please refer to the `SupportMenuBean` class for details. You can save the feature list content according to your specific business requirements.
+> The feature table describes device capabilities; it is not a set of feature switches. For capability flags, `true` means supported and `false` means unsupported.
+>
+> Changing `SupportMenuBean` properties or calling an SDK setting method cannot add a feature that the device does not support. SDK APIs can only control features already supported by the device.
+>
+> To add feature support, first confirm whether a compatible firmware update is available. If additional hardware capabilities are required, use a device model that supports the feature.
 
-`  fun onRingDidFunctionMenu(supportMenuBean:SupportMenuBean)`
+You may cache the feature table for your application. Retrieve it again after switching devices or updating the firmware.
 
-DeviceFuncV2Model class attribute definitions:
+`fun onRingDidFunctionMenu(device: BleDevice?, supportMenuBean: SupportMenuBean)`
+
+SupportMenuBean property definitions:
 
 | SupportMenuBean attribute   | Description                                                  |
 | --------------------------- | ------------------------------------------------------------ |
-| isPushMsgEnableSwitch       | Enable or disable the message control switch?                |
+| isPushMsgEnableSwitch       | Whether notification switches are supported                  |
 | pushMsgSwitchValue          | Supported message types, low 32 bits (bit0-bit31)            |
 | pushMsgSwitchValue2         | Supported message types, high 32 bits (bit32-bit63); defaults to 0 on old devices |
 | activityDataInterval        | Today's step-detail interval in minutes; an unconfigured value is normalized to 60 |
@@ -289,6 +297,9 @@ DeviceFuncV2Model class attribute definitions:
 | isSupportCustomerModel | Supports setting and reading the customer model |
 | isSupportCompositeMeasurement | Supports composite health measurement (3.2.2.1) |
 | isSupportCustomTextDisplay | Supports custom text display and duration settings (3.2.1.35) |
+| isSupportDeviceBodyColor | Supports setting and reading the device body color (3.2.1.36) |
+| isSupportVibrationSwitch | Supports setting and reading the vibration master switch (3.2.1.37) |
+| isSupportDeviceSize | Supports setting and reading the device size (3.2.1.38) |
 
 
 ##### 3.1.7 Read connected RSSI
@@ -395,6 +406,8 @@ Return Value:
 | uiVersion                | String | UI version                                       |
 | deviceForm               | int    | Product form: 0 ring without a screen, 1 ring with a screen, 2 bracelet without a screen, 3 bracelet with a screen, 4 wristband without a screen, 5 wristband with a screen, 6 watch; -1 unavailable or unsupported |
 | customerModel | String | Customer model; defaults to the device model and returns the device model when unavailable. See 3.2.1.34 for setting and reading this value |
+| deviceBodyColor | int | Device body color: 0 not set, 1 black, 2 pink, 3 red, 4 silver, 5 gold; -1 unavailable or unsupported. Requires device firmware support |
+| deviceSize | int | Device size number, e.g. 9 for size 9 or 10 for size 10; 0 not set, -1 unavailable or unsupported. See 3.2.1.38 for setting and reading this value |
 
 > **Important:** Before a firmware upgrade, verify that the device's `deviceClazz` matches the device model supported by the firmware package. Proceed with the upgrade only when they match. Do not upgrade if they do not match.
 
@@ -1255,7 +1268,7 @@ DevicePushType description:
 | RECORD_REALTIME_DATA | Real-time recording audio | RecordRealtimeDataBean | [3.2.5.7 Real-time Recording](#3257-real-time-recording) |
 | COUNT_CONTROL | Counting recognition state | Boolean: true enabled, false disabled | [3.2.1.33 Counting Recognition Control and State Queries](#32133-counting-recognition-control-and-state-queries) |
 | MUSLIM_COUNT   | Muslim count real-time report | MuslimCountItemBean | [3.2.1.15 Reminder Function](#32115-getting-and-setting-whether-the-reminder-function-is-enabled) |
-| TOUCH_EVENT    | Touch / fall / SOS / repeated taps | TouchEventBean | Requires firmware support.<br>keyType: 1: touch key, 2: fall ([requires enabling 3.2.1.24](#32124-fall-detection-setting)), 3: SOS, 4: repeated taps.<br>touchType: for touch keys, 1: single tap, 2: double tap, 3: triple tap, 4: long press, 5: shake, 6: Release after a long press; defaults to 1 for fall; unused for SOS; contains the tap count (1-9) for repeated taps |
+| TOUCH_EVENT    | Touch / fall / SOS / repeated taps | TouchEventBean | Requires firmware support.<br>keyType: 1: touch key, 2: fall (requires fall detection to be enabled), 3: SOS, 4: repeated taps.<br>touchType: for touch keys, 1: single tap, 2: double tap, 3: triple tap, 4: long press, 5: shake, 6: Release after a long press; defaults to 1 for fall; unused for SOS; contains the tap count (1-9) for repeated taps |
 
 Method Description:
 
@@ -1378,55 +1391,6 @@ private val factoryTestCallback by lazy {
 ```
 
 
-
-##### 3.2.1.24 Fall Detection Setting
-
-> Set or get the fall detection switch. When enabled, the device reports through the touch event notification when a fall is detected.
->
-> Fall events are received via the `TOUCH_EVENT` type of [3.2.1.21 Device Push Notification](#32121-device-push-notification); keyType=2 indicates a fall event.
->
-> Configuration table attribute: `isSupportFallDetect`
->
-> The result is returned via [callback].
-
-Method Description:
-
-`fun setFallDetect(enable: Boolean, callback: FallDetectCallback)`
-
-`fun getFallDetect(callback: FallDetectCallback)`
-
-Parameter Description:
-
-| Parameter | Type               | Description    | Value                                                      |
-| --------- | ------------------ | -------------- | ---------------------------------------------------------- |
-| enable    | Boolean            | Switch         | true: on, false: off                                       |
-| callback  | FallDetectCallback | Result callback | Set: onSuccess()/onFail();<br>Query: onResult(Int, 0=off 1=on); |
-
-Example of usage:
-
-```kotlin
-//Query the fall detection switch
-DHBleSdk.getFallDetect(object : FallDetectCallback {
-    override fun onSuccess() = Unit
-    override fun onFail(errorCode: Int) {
-        Log.e("RWSDK", "fall detect query failed: $errorCode")
-    }
-    override fun onResult(data: Int) {
-        Log.e("RWSDK", "FallDetect state: $data (0=off, 1=on)")
-    }
-})
-
-//Enable fall detection
-DHBleSdk.setFallDetect(true, object : FallDetectCallback {
-    override fun onSuccess() {
-        Log.e("RWSDK", "FallDetect enabled")
-    }
-    override fun onFail(errorCode: Int) {
-        Log.e("RWSDK", "FallDetect set failed: $errorCode")
-    }
-    override fun onResult(data: Int) = Unit
-})
-```
 
 ##### 3.2.1.25 Count Reminder Interval Setting
 
@@ -1994,6 +1958,78 @@ if (supportMenu.isSupportCustomTextDisplay) {
         override fun onFail(errorCode: Int) {
             Log.e("RWSDK", "Custom text display failed: $errorCode")
         }
+    })
+}
+```
+
+##### 3.2.1.36 Set and Read Device Body Color
+
+> Requires `isSupportDeviceBodyColor`. Set or read the device body color. The color is also available through `BleDevice.deviceBodyColor` in scan results and `FirmVersionBean.deviceBodyColor` in device information.
+
+`fun setDeviceBodyColor(color: Int, callback: CustomStatusCallback)`
+
+`fun getDeviceBodyColor(callback: DeviceBodyColorCallback)`
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| color | Int | `0`: Not set<br>`1`: Black<br>`2`: Pink<br>`3`: Red<br>`4`: Silver<br>`5`: Gold |
+
+Setting results are returned through `onSuccess()` / `onFail(errorCode)`. A successful query returns the color through `onResult(data: Int)`.
+
+```kotlin
+if (supportMenu.isSupportDeviceBodyColor) {
+    DHBleSdk.getDeviceBodyColor(object : DeviceBodyColorCallback {
+        override fun onResult(data: Int?) { Log.e("RWSDK", "Body color=$data") }
+        override fun onSuccess() = Unit
+        override fun onFail(errorCode: Int) { Log.e("RWSDK", "Read failed=$errorCode") }
+    })
+}
+```
+
+##### 3.2.1.37 Set and Read the Vibration Master Switch
+
+> Requires `isSupportVibrationSwitch`. Set or read the device vibration master switch. Device firmware support is required.
+
+`fun setVibrationSwitch(enabled: Boolean, callback: CustomStatusCallback)`
+
+`fun getVibrationSwitch(callback: VibrationSwitchCallback)`
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| enabled | Boolean | `true`: On<br>`false`: Off |
+
+Setting results are returned through `onSuccess()` / `onFail(errorCode)`. A successful query returns the current switch state through `onResult(data: Boolean)`.
+
+```kotlin
+if (supportMenu.isSupportVibrationSwitch) {
+    DHBleSdk.getVibrationSwitch(object : VibrationSwitchCallback {
+        override fun onResult(data: Boolean?) { Log.e("RWSDK", "Vibration master switch=$data") }
+        override fun onSuccess() = Unit
+        override fun onFail(errorCode: Int) { Log.e("RWSDK", "Read failed=$errorCode") }
+    })
+}
+```
+
+##### 3.2.1.38 Set and Get Device Size
+
+> Requires `isSupportDeviceSize`. Set or read the device size. The size is also available through `BleDevice.deviceSize` in scan results and `FirmVersionBean.deviceSize` in device information. Device firmware support is required.
+
+`fun setDeviceSize(size: Int, callback: CustomStatusCallback)`
+
+`fun getDeviceSize(callback: DeviceSizeCallback)`
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| size | Int | Device size number, e.g. `9` for size 9 or `10` for size 10; `0` means not set |
+
+Setting results are returned through `onSuccess()` / `onFail(errorCode)`. A successful query returns the current size number through `onResult(data: Int)`.
+
+```kotlin
+if (supportMenu.isSupportDeviceSize) {
+    DHBleSdk.getDeviceSize(object : DeviceSizeCallback {
+        override fun onResult(data: Int?) { Log.e("RWSDK", "Device size=$data") }
+        override fun onSuccess() = Unit
+        override fun onFail(errorCode: Int) { Log.e("RWSDK", "Read failed=$errorCode") }
     })
 }
 ```
@@ -3097,7 +3133,7 @@ DHBleSdk.recordRealtimeControl(true, controlCallback)
 
 Register the listener before starting. Recording status remains available through `RECORD_STATUS` pushes or `getRecordStatus()`; `realtime` indicates whether real-time mode is active.
 
-#### 5.2.5 Sensor Raw Data
+#### 5.2.5 Sensor Raw Data (Custom Feature)
 
 This section covers two different data retrieval methods:
 
@@ -3365,6 +3401,13 @@ DHBleSdk.getPpgSampleRate(object : PpgSampleRateCallback {
 ```
 
 ## SDK Revision History
+
+**V2.0.0_20261116** (2026.11.16)
+
+- Added `setDeviceSize`/`getDeviceSize` for the device size (3.2.1.38); added `isSupportDeviceSize` to the configuration table and `deviceSize` to scan results and device information (0 not set, -1 unavailable)
+- Added `setDeviceBodyColor`/`getDeviceBodyColor` for the device body color (3.2.1.36); added `isSupportDeviceBodyColor` to the configuration table
+- Added `setVibrationSwitch`/`getVibrationSwitch` for the vibration master switch (3.2.1.37); added `isSupportVibrationSwitch` to the configuration table
+- Fixed `SportResultBean.calorie` values in multi-sport reports being 10 times too high; the unit is now consistent with real-time workout data (3.2.4.4)
 
 **V2.0.0_20261105** (2026.11.05)
 
